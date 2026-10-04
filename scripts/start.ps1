@@ -1,7 +1,14 @@
 ﻿param([switch]$NoBrowser, [switch]$NoOverlay)
 . "$PSScriptRoot\common.ps1"
+if (-not (Test-Path -LiteralPath (Join-Path $projectRoot '.env'))) {
+    throw '接続設定がありません。setup.batを実行し、MySQLの接続情報を入力してください。'
+}
 Import-LocalSettings
 New-Item -ItemType Directory -Path $runtimeDir -Force | Out-Null
+. "$PSScriptRoot\database.ps1"
+$mysqlBin = Get-KusakariMySqlBin -Portable:($env:KUSAKARI_DATABASE_MODE -eq 'managed')
+if ($env:KUSAKARI_DATABASE_MODE -eq 'managed') { $null = Start-ManagedMySql }
+$null = Invoke-MySql $env:KUSAKARI_DB_USER $env:KUSAKARI_DB_PASSWORD ([int]$env:KUSAKARI_DB_PORT) 'USE kusakari; SELECT 1;'
 
 $jar = Join-Path $projectRoot 'backend\target\kusakari-api-0.1.0.jar'
 $vite = Join-Path $projectRoot 'node_modules\vite\bin\vite.js'

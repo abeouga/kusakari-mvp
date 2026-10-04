@@ -1,20 +1,23 @@
 import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
+import { join } from 'node:path';
+import { e2eDatabasePort, importRuntimeTools } from '../scripts/runtime-tools.mjs';
 
 if (existsSync('.env')) process.loadEnvFile('.env');
+const tools = importRuntimeTools(process.cwd());
 
 // Only test-owned fixtures and replenishment of purchases made by these tests are allowed.
 export function sql(statement) {
-  if (!/^jdbc:mysql:\/\/127\.0\.0\.1:3306\/kusakari_e2e(?:\?|$)/.test(process.env.KUSAKARI_E2E_DB_URL || '')) {
-    throw new Error('Refusing to access anything except kusakari_e2e.');
-  }
-  const executable = process.env.MYSQL_CLIENT || 'C:\\Program Files\\MySQL\\MySQL Server 8.0\\bin\\mysql.exe';
+  const port = e2eDatabasePort();
+  const executable = process.env.MYSQL_CLIENT || (tools.MySql ? join(tools.MySql, 'mysql.exe') : 'mysql');
   const result = spawnSync(
     executable,
     [
       '-h',
       '127.0.0.1',
+      '-P',
+      String(port),
       '-u',
       process.env.KUSAKARI_DB_USER,
       '--default-character-set=utf8mb4',

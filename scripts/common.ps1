@@ -1,15 +1,39 @@
 ﻿$ErrorActionPreference = 'Stop'
 $projectRoot = [IO.Path]::GetFullPath((Split-Path $PSScriptRoot -Parent)).TrimEnd('\')
+# A .bat launched from PowerShell 7 can inherit its incompatible core modules.
+if ($PSVersionTable.PSVersion.Major -eq 5) { $env:PSModulePath = "$PSHOME\Modules;$env:PSModulePath" }
 $runtimeDir = Join-Path $projectRoot '.runtime'
 $servicePorts = @(8086, 5186)
+. "$PSScriptRoot\toolchain.ps1"
+Import-Toolchain
 
 function Import-LocalSettings {
     $settingsFile = Join-Path $projectRoot '.env'
     if (-not (Test-Path -LiteralPath $settingsFile)) { throw '.env がありません。.env.example から作成してください。' }
+    $allowed = @('KUSAKARI_DB_USER','KUSAKARI_DB_PASSWORD','KUSAKARI_DB_URL','KUSAKARI_E2E_DB_URL','KUSAKARI_DB_PORT','KUSAKARI_DATABASE_MODE')
+    foreach ($key in $allowed) { [Environment]::SetEnvironmentVariable($key, $null, 'Process') }
+    $seen = @{}
     foreach ($line in Get-Content -LiteralPath $settingsFile) {
         if ($line -match '^([A-Z][A-Z0-9_]*)=(.*)$') {
-            [Environment]::SetEnvironmentVariable($matches[1], $matches[2], 'Process')
+            $key = $matches[1]
+            if ($key -notin $allowed -or $seen.ContainsKey($key)) { throw '.envに未対応または重複する設定があります。setup.bat -Reconfigureで設定してください。' }
+            $seen[$key] = $true
+            $value = $matches[2].Trim()
+            if ($value.Length -ge 2 -and (($value.StartsWith("'") -and $value.EndsWith("'")) -or
+                ($value.StartsWith('"') -and $value.EndsWith('"')))) { $value = $value.Substring(1, $value.Length - 2) }
+            [Environment]::SetEnvironmentVariable($key, $value, 'Process')
         }
+    }
+    if (-not $env:KUSAKARI_DB_PORT) { $env:KUSAKARI_DB_PORT = '3306' }
+    if (-not $env:KUSAKARI_DATABASE_MODE) { $env:KUSAKARI_DATABASE_MODE = 'existing' }
+    if ($env:KUSAKARI_DB_USER -notmatch '^[A-Za-z0-9_]{1,32}$' -or $env:KUSAKARI_DB_USER -eq 'root') { throw 'アプリ用DBユーザー設定が不正です。setup.bat -Reconfigureで設定してください。' }
+    if ($env:KUSAKARI_DB_PORT -notmatch '^\d{1,5}$' -or [int]$env:KUSAKARI_DB_PORT -lt 1 -or [int]$env:KUSAKARI_DB_PORT -gt 65535) { throw 'DBポート設定が不正です。' }
+    if ($env:KUSAKARI_DATABASE_MODE -notin @('existing','managed')) { throw 'MySQL方式の設定が不正です。' }
+    if (-not $env:KUSAKARI_DB_PASSWORD -or $env:KUSAKARI_DB_PASSWORD.Length -gt 128 -or $env:KUSAKARI_DB_PASSWORD -match "['\r\n\x00]") { throw 'アプリ用DBパスワード設定が不正です。setup.bat -Reconfigureで設定してください。' }
+    foreach ($pair in @(@('KUSAKARI_DB_URL','kusakari'), @('KUSAKARI_E2E_DB_URL','kusakari_e2e'))) {
+        $url = [Environment]::GetEnvironmentVariable($pair[0], 'Process')
+        $pattern = '^jdbc:mysql://127\.0\.0\.1:' + [regex]::Escape($env:KUSAKARI_DB_PORT) + '/' + $pair[1] + '\?connectionTimeZone=UTC$'
+        if ($url -notmatch $pattern) { throw 'DB設定は127.0.0.1のKusakari専用DBに限定しています。setup.bat -Reconfigureで設定してください。' }
     }
 }
 

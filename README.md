@@ -7,11 +7,11 @@ Greenlyとは別プロジェクトで、コード・ポート・DBを分離し�
 
 - **画面:** http://127.0.0.1:5186
 - **API:** http://127.0.0.1:8086/api/health
-- **作業先:** `C:\Users\hanam\Desktop\kusakari-mvp`
+- **作業先:** ソースを配置したフォルダー
 - **起動:** `start.bat` をダブルクリック
 - **停止:** `stop.bat` をダブルクリック
 
-現在の環境ではセットアップ済みです。`start.bat` はブラウザーとKusakari専用のSysOverRay操作画面を開き、画面の表示と操作ボタンまで確認します。ブラウザーを自動で開かない場合は `start.bat -NoBrowser` を実行します。
+初回は `setup.bat` で接続設定と依存を準備します。`start.bat` はブラウザーとKusakari専用のSysOverRay操作画面を開き、画面の表示と操作ボタンまで確認します。ブラウザーを自動で開かない場合は `start.bat -NoBrowser` を実行します。
 再実行時は、この作業フォルダから起動したWeb/APIを停止してから同じ5186/8086で作り直します。別のプロセスが固定ポートを使っている場合は停止せず、エラーにします。代替ポートへ移動しません。
 Javaや依存を更新した場合は、停止 → ビルド → 起動の順に実行します。
 
@@ -62,21 +62,16 @@ docs/               設計判断、API、画像プロンプト、検証記録
 
 ## 別環境でのセットアップ
 
-前提は Windows、Node.js 24、JDK 21または25、MySQL 8、MySQL CLI、.NET 10 SDKとDesktop Runtimeです。
-この環境では Node 24.14.1 / JDK 25.0.1 / MySQL 8.0.45 で検証しました。
-Mavenは同梱Wrapperから3.9.12を取得します。
+Windows 10/11 x64で `setup.bat` を実行し、端末からMySQL方式・接続ポート・管理者名・管理者パスワード・アプリ用ユーザー・パスワードを入力します。`.env` の手動作成は不要です。
+MySQLがないPCでは `managed` を選び、Kusakari専用のローカルMySQLを用意できます。
+不足するNode.js LTS、JDK 21、.NET 10 SDKをユーザー領域に取得し、依存・API・Web・SysOverRayをビルドします。
+開発/E2E DBに対する認証・Flyway・実API起動が成功したら `start.bat` で起動します。
 
-1. `.env.example` を `.env` にコピーし、専用DBユーザーのパスワードを設定します。
-2. MySQLを起動します。
-3. `setup.bat` を実行し、MySQL rootのパスワードを入力します。
-4. `start.bat` を実行します。
-
-セットアップは `kusakari` / `kusakari_e2e` と専用ユーザー `kusakari` を作成します。
-既存ユーザーのパスワード、既存の表・商品・注文は上書きしません。アプリ起動時にFlywayを実行し、初回だけ商品と在庫を登録します。
-認証情報を持つ `.env`、実行ログ、テスト成果物はGit対象外です。
-
-MySQL CLIの場所が標準インストール先と異なる場合、セットアップ時は `mysql.exe` をPATHへ追加してください。
-E2Eでは `MYSQL_CLIENT` 環境変数にCLIのフルパスを指定できます。
+通常の再実行は保存済み資格情報を使用します。設定変更は `setup.bat -Reconfigure` です。
+パスワードは非表示入力で、既存MySQLの管理者パスワードは保存しません。
+既存データと既存ユーザーのパスワードは上書きしません。
+別PCへ `.env`、`.runtime`、DBデータをコピーせず、そのPCでセットアップしてください。
+手順と制約は [docs/windows-setup.md](docs/windows-setup.md) を参照してください。
 
 ## 開発と検証
 

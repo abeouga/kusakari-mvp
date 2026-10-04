@@ -1,5 +1,8 @@
 ﻿$ErrorActionPreference = 'Stop'
 $source = Join-Path $PSScriptRoot 'SysOverRay'
+$projectRoot = Split-Path $PSScriptRoot -Parent
+. (Join-Path $projectRoot 'scripts\toolchain.ps1')
+Import-Toolchain
 $project = Join-Path $source 'KusakariSysOverRay.csproj'
 $destination = Join-Path $PSScriptRoot 'app'
 $executable = Join-Path $destination 'KusakariSysOverRay.exe'

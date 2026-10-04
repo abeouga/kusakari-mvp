@@ -1,38 +1,60 @@
-﻿param([switch]$SkipInstall)
+﻿param(
+    [switch]$SkipInstall,
+    [switch]$Reconfigure,
+    [ValidateSet('auto','existing','managed')][string]$DatabaseMode = 'auto'
+)
 . "$PSScriptRoot\common.ps1"
-Import-LocalSettings
+. "$PSScriptRoot\database.ps1"
+New-Item -ItemType Directory -Path $runtimeDir -Force | Out-Null
 Set-Location $projectRoot
-$mysql = Get-Command mysql.exe -ErrorAction SilentlyContinue
-$mysqlPath = if ($mysql) { $mysql.Source } else { 'C:\Program Files\MySQL\MySQL Server 8.0\bin\mysql.exe' }
-if (-not (Test-Path -LiteralPath $mysqlPath)) { throw 'MySQL client is required. Add mysql.exe to PATH.' }
-if (-not $env:KUSAKARI_ADMIN_PASSWORD) {
-    $credential = New-Object System.Management.Automation.PSCredential('root',(Read-Host 'MySQL root password' -AsSecureString))
-    $env:KUSAKARI_ADMIN_PASSWORD = $credential.GetNetworkCredential().Password
-}
-if ($env:KUSAKARI_DB_USER -ne 'kusakari') { throw 'This setup provisions only the kusakari database user.' }
-if ($env:KUSAKARI_DB_PASSWORD -notmatch '^[A-Za-z0-9_!@#%+=.-]{1,128}$') { throw 'Use 1-128 letters, numbers, or _!@#%+=.- for the local DB password.' }
-$env:MYSQL_PWD = $env:KUSAKARI_ADMIN_PASSWORD
+$lock = $null
 try {
-    $sql = @"
-CREATE DATABASE IF NOT EXISTS kusakari CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
-CREATE DATABASE IF NOT EXISTS kusakari_e2e CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
-CREATE USER IF NOT EXISTS 'kusakari'@'localhost' IDENTIFIED BY '$($env:KUSAKARI_DB_PASSWORD)';
-GRANT SELECT,INSERT,UPDATE,DELETE,CREATE,ALTER,DROP,INDEX,REFERENCES ON kusakari.* TO 'kusakari'@'localhost';
-GRANT SELECT,INSERT,UPDATE,DELETE,CREATE,ALTER,DROP,INDEX,REFERENCES ON kusakari_e2e.* TO 'kusakari'@'localhost';
-"@
-    $sql | & $mysqlPath -h 127.0.0.1 -u root --default-character-set=utf8mb4
-    if ($LASTEXITCODE -ne 0) { throw 'MySQL provisioning failed.' }
-} finally { Remove-Item Env:MYSQL_PWD, Env:KUSAKARI_ADMIN_PASSWORD -ErrorAction SilentlyContinue }
-if (-not $SkipInstall) {
-    & npm.cmd ci
-    if ($LASTEXITCODE -ne 0) { throw 'npm ci failed.' }
-    & npm.cmd run build:api
-    if ($LASTEXITCODE -ne 0) { throw 'API build failed.' }
-    & npm.cmd run build:web
-    if ($LASTEXITCODE -ne 0) { throw 'Web build failed.' }
-    & npx.cmd playwright install chromium
-    if ($LASTEXITCODE -ne 0) { throw 'Browser install failed.' }
-    & (Join-Path $projectRoot 'sysover-ray2\setup.ps1')
-    if ($LASTEXITCODE -and $LASTEXITCODE -ne 0) { throw 'SysOverRay build failed.' }
-}
-Write-Host 'Setup complete. Run start.bat.'
+    try { $lock = [IO.File]::Open((Join-Path $runtimeDir 'setup.lock'), 'OpenOrCreate', 'ReadWrite', 'None') }
+    catch { throw 'このフォルダーで別のsetupが実行中です。終了してから再実行してください。' }
+    Initialize-Toolchain
+    Initialize-Database $DatabaseMode -reconfigure:$Reconfigure
+    if (-not $SkipInstall) {
+        foreach ($command in @(@('ci'), @('run','build:api'), @('run','build:web'))) {
+            & npm.cmd @command
+            if ($LASTEXITCODE -ne 0) { throw '依存復元またはビルドに失敗しました。上の診断を確認してください。' }
+        }
+        & npx.cmd playwright install chromium
+        if ($LASTEXITCODE -ne 0) { throw 'Chromiumの導入に失敗しました。' }
+        & (Join-Path $projectRoot 'sysover-ray2\setup.ps1')
+        if ($LASTEXITCODE -and $LASTEXITCODE -ne 0) { throw 'SysOverRayのビルドに失敗しました。' }
+    }
+    $jar = Join-Path $projectRoot 'backend\target\kusakari-api-0.1.0.jar'
+    if (-not (Test-Path -LiteralPath $jar)) { throw 'APIのビルドがありません。-SkipInstallを外して再実行してください。' }
+    # Exercise Spring/Flyway for both DBs; never reset application data.
+    $previousUrl = $env:KUSAKARI_DB_URL
+    try {
+        foreach ($db in @('kusakari','kusakari_e2e')) {
+            $listener = New-Object Net.Sockets.TcpListener([Net.IPAddress]::Loopback, 0)
+            $listener.Start(); $apiPort = $listener.LocalEndpoint.Port; $listener.Stop()
+            $env:KUSAKARI_API_PORT = [string]$apiPort
+            if ($db -eq 'kusakari_e2e') { $env:KUSAKARI_DB_URL = $env:KUSAKARI_E2E_DB_URL }
+            $process = Start-Process -FilePath (Get-JavaExecutable) -ArgumentList @('-jar', "`"$jar`"") -WorkingDirectory $projectRoot `
+                -WindowStyle Hidden -PassThru -RedirectStandardOutput "$runtimeDir\setup-$db.log" -RedirectStandardError "$runtimeDir\setup-$db-error.log"
+            try {
+                $deadline = (Get-Date).AddSeconds(60)
+                $ready = $false
+                do {
+                    if ($process.HasExited) { throw "API/Flyway初期化失敗: $db。.runtimeのsetupログを確認してください。" }
+                    try {
+                        $health = Invoke-RestMethod "http://127.0.0.1:$apiPort/api/health" -TimeoutSec 2
+                        $ready = $health.application -eq 'kusakari'
+                    } catch { Start-Sleep -Milliseconds 400 }
+                } while (-not $ready -and (Get-Date) -lt $deadline)
+                if (-not $ready) { throw 'セットアップ用APIが起動しませんでした。' }
+                $verification = "SELECT COUNT(*) FROM $db.flyway_schema_history WHERE success=1; SELECT COUNT(*) FROM $db.products;"
+                $result = (Invoke-MySql $env:KUSAKARI_DB_USER $env:KUSAKARI_DB_PASSWORD ([int]$env:KUSAKARI_DB_PORT) $verification).Output -split "`r?`n"
+                if ($result.Count -lt 2 -or [int]$result[0] -lt 1 -or [int]$result[1] -lt 4) { throw 'Flyway履歴または初期カタログの検証に失敗しました。' }
+                Write-Host "$db : 実API起動・Flyway・商品データを確認しました。"
+            } finally {
+                if (-not $process.HasExited) { Stop-Process -Id $process.Id -Force; $null = $process.WaitForExit(5000) }
+                $process.Dispose()
+            }
+        }
+    } finally { $env:KUSAKARI_DB_URL = $previousUrl; Remove-Item Env:KUSAKARI_API_PORT -ErrorAction SilentlyContinue }
+    Write-Host 'セットアップが完了しました。start.batで起動してください。'
+} finally { if ($lock) { $lock.Dispose() } }
