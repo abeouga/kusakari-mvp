@@ -1,0 +1,150 @@
+.material-banner {
+  display: flex;
+  align-items: center;
+  gap: 35px;
+  background: #e9eedf;
+  margin: 10px auto 0;
+  padding-block: 37px;
+  max-width: 1170px;
+}
+.material-illustration {
+  border: 1px solid #bac6ac;
+  width: 115px;
+  height: 125px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 14px;
+  transform: rotate(-5deg);
+  color: #627456;
+  flex-shrink: 0;
+}
+.material-illustration span {
+  font-size: 7px;
+  letter-spacing: 1px;
+}
+.material-banner .eyebrow {
+  margin-bottom: 10px;
+  font-size: 9px;
+}
+.material-banner h2 {
+  font-size: 23px;
+}
+.material-banner p:not(.eyebrow) {
+  font-size: 11px;
+  margin: 15px 0 0;
+  color: #6c7863;
+}
+.material-banner > button {
+  margin-left: auto;
+  white-space: nowrap;
+  font-size: 11px;
+  gap: 18px;
+}
+.editorial {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: center;
+  padding-block: 75px;
+  gap: 40px;
+}
+.editorial h2 {
+  font-size: 29px;
+  line-height: 1.9;
+}
+.editorial .eyebrow {
+  margin-bottom: 20px;
+}
+.editorial > div:last-child {
+  padding-left: 10%;
+}
+.editorial p:not(.eyebrow) {
+  font-size: 12px;
+  line-height: 2.3;
+  color: var(--muted);
+}
+.text-link {
+  display: inline-flex;
+  gap: 35px;
+  align-items: center;
+  border: 0;
+  border-bottom: 1px solid #a4ae9b;
+  padding: 10px 0;
+  background: none;
+  font-size: 12px;
+}
+.site-footer {
+  padding: 44px 5% 20px;
+  background: #203f32;
+  color: #eef1e5;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+}
+.footer-brand {
+  font-size: 32px;
+}
+.footer-brand svg {
+  color: #b9cbb0;
+}
+.site-footer p {
+  font-size: 10px;
+  letter-spacing: 2px;
+  margin: 16px 0 26px;
+  color: #bfccbb;
+}
+.footer-links {
+  display: flex;
+  gap: 32px;
+}
+.footer-links button {
+  background: none;
+  border: 0;
+  color: #e6eddf;
+  font-size: 11px;
+  padding: 10px 0;
+}
+.footer-bottom {
+  width: 100%;
+  border-top: 1px solid #496152;
+  display: flex;
+  justify-content: space-between;
+  padding-top: 20px;
+  font-size: 9px;
+  color: #a6b99f;
+  letter-spacing: 1px;
+}
+.toast {
+  position: fixed;
+  bottom: 25px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 16px 20px;
+  background: #294c3e;
+  color: white;
+  box-shadow: 0 8px 25px #10251b26;
+  font-size: 12px;
+  border-radius: 3px;
+  max-width: 95vw;
+}
+.toast button {
+  border: 0;
+  background: none;
+  color: white;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  font-size: 11px;
+  white-space: nowrap;
+}
+.toast > button:first-of-type {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}

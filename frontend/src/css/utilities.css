@@ -1,0 +1,73 @@
+.loading,
+.empty {
+  text-align: center;
+  padding: 50px 20px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.empty svg {
+  margin: 0 auto 20px;
+}
+.empty h3 {
+  font-size: 16px;
+  font-family: var(--serif);
+  font-weight: 500;
+}
+.empty p {
+  font-size: 12px;
+}
+.full {
+  width: 100%;
+}
+.muted {
+  color: var(--muted);
+  font-size: 12px;
+}
+.fine-print {
+  color: #7f8579;
+  font-size: 10px;
+  line-height: 1.9;
+  margin: 16px 0;
+}
+.error {
+  background: #f8eae2;
+  color: #943d2f;
+  font-size: 12px;
+  padding: 14px 16px;
+  border: 1px solid #e5c6bc;
+  line-height: 1.8;
+}
+.error button {
+  margin-left: 16px;
+}
+.error-text {
+  color: #aa4e35 !important;
+  font-size: 11px !important;
+}
+.success-text {
+  color: #3e6b40;
+  font-size: 12px;
+}
+.text-button {
+  border: 0;
+  background: none;
+  color: var(--green);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  padding: 5px;
+  font-size: 11px;
+}
+.icon-button {
+  border: 0;
+  background: none;
+  display: grid;
+  place-items: center;
+  padding: 8px;
+}
+.pill {
+  background: #e9eedd;
+  padding: 4px 8px;
+  font-size: 9px;
+  border-radius: 20px;
+  font-weight: 400;
+}

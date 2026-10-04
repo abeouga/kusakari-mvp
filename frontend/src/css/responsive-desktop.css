@@ -1,0 +1,60 @@
+@media (min-width: 1600px) {
+  .site-header,
+  .announcement {
+    padding-inline: calc((100vw - 1360px) / 2);
+  }
+  .hero {
+    border-inline: 1px solid var(--line);
+  }
+}
+@media (max-width: 1000px) {
+  .site-header {
+    gap: 20px;
+    padding-inline: 4%;
+  }
+  .site-header nav {
+    gap: 20px;
+  }
+  .header-actions {
+    gap: 12px;
+  }
+  .hero {
+    min-height: 550px;
+  }
+  .hero-copy {
+    padding: 50px 9% 25px;
+  }
+  .hero h1 {
+    font-size: 57px;
+  }
+  .hero-footnote {
+    margin-top: 30px;
+  }
+  .product-grid {
+    gap: 17px;
+  }
+  .categories button {
+    padding: 9px 12px;
+  }
+  .material-banner {
+    margin-inline: 5%;
+    gap: 24px;
+  }
+  .material-banner h2 {
+    font-size: 21px;
+  }
+  .material-illustration {
+    width: 85px;
+    height: 115px;
+  }
+  .material-banner > button {
+    padding: 13px;
+    font-size: 10px;
+  }
+  .benefits {
+    gap: 5%;
+  }
+  .product-name {
+    font-size: 14px;
+  }
+}

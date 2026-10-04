@@ -1,0 +1,147 @@
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { api, ApiError } from './api';
+
+export function useShop() {
+  const [cart, setCart] = useState(/** @type {import('./types').Cart|null} */ (null));
+  const [products, setProducts] = useState(/** @type {import('./types').Product[]} */ ([]));
+  const [stores, setStores] = useState(/** @type {import('./types').Store[]} */ ([]));
+  const [orders, setOrders] = useState(/** @type {import('./types').Order[]} */ ([]));
+  const [lastOrder, setLastOrder] = useState(/** @type {import('./types').Order|null} */ (null));
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+  const [locationLabel, setLocationLabel] = useState('東京駅');
+  const checkoutRequest = useRef(/** @type {import('./types').Checkout|null} */ (null));
+  const operation = useRef(false);
+
+  const refresh = useCallback(async () => {
+    const nextCart = await api.cart();
+    setCart(nextCart);
+    const [nextProducts, nextOrders] = await Promise.all([api.products(nextCart.storeId), api.orders()]);
+    setProducts(nextProducts);
+    setOrders(nextOrders);
+  }, []);
+
+  const run = useCallback(
+    /** @param {() => Promise<void>} action */ async (action) => {
+      if (operation.current) return;
+      operation.current = true;
+      setBusy(true);
+      setError('');
+      setNotice('');
+      try {
+        await action();
+      } catch (reason) {
+        setError(reason instanceof Error ? reason.message : '処理に失敗しました。');
+        if (reason instanceof ApiError && reason.status === 409) {
+          checkoutRequest.current = null;
+          try {
+            await refresh();
+          } catch {
+            /* Keep the original conflict visible. */
+          }
+        }
+      } finally {
+        operation.current = false;
+        setBusy(false);
+      }
+    },
+    [refresh],
+  );
+
+  const initialize = useCallback(
+    () =>
+      run(async () => {
+        await refresh();
+        setStores(await api.stores(35.6812, 139.7671));
+      }),
+    [run, refresh],
+  );
+
+  useEffect(() => {
+    void initialize();
+  }, [initialize]);
+
+  /** @param {string} id @param {number} quantity */
+  const setQuantity = (id, quantity) =>
+    run(async () => {
+      if (!cart) return;
+      setCart(await api.setItem(id, quantity, cart.revision));
+      checkoutRequest.current = null;
+      setNotice(quantity === 0 ? 'カートから削除しました。' : 'カートを更新しました。');
+    });
+
+  /** @param {string} id @param {number} [quantity] */
+  const add = (id, quantity = 1) => {
+    const current = cart?.items.find((line) => line.product.id === id)?.quantity || 0;
+    return setQuantity(id, current + quantity);
+  };
+
+  /** @param {number} id */
+  const selectStore = (id) =>
+    run(async () => {
+      if (!cart) return;
+      const next = await api.setStore(id, cart.revision);
+      setCart(next);
+      checkoutRequest.current = null;
+      setProducts(await api.products(id));
+      setNotice('受取店舗を変更しました。在庫を確認してください。');
+    });
+
+  const checkout = () =>
+    run(async () => {
+      if (!cart) return;
+      checkoutRequest.current ??= {
+        requestId: crypto.randomUUID(),
+        revision: cart.revision,
+        expectedTotalYen: cart.totalYen,
+      };
+      const order = await api.checkout(checkoutRequest.current);
+      setLastOrder(order);
+      checkoutRequest.current = null;
+      await refresh();
+    });
+
+  /** @param {number} lat @param {number} lon @param {string} label */
+  const locate = (lat, lon, label) =>
+    run(async () => {
+      setStores(await api.stores(lat, lon));
+      setLocationLabel(label);
+    });
+
+  const geolocate = () => {
+    if (!navigator.geolocation) {
+      setError('このブラウザーは現在地の取得に対応していません。');
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        void locate(position.coords.latitude, position.coords.longitude, '現在地');
+      },
+      () => setError('現在地を取得できませんでした。基準地点を選択してください。'),
+      { timeout: 10000, maximumAge: 60000 },
+    );
+  };
+
+  return {
+    cart,
+    products,
+    stores,
+    orders,
+    lastOrder,
+    setLastOrder,
+    busy,
+    error,
+    setError,
+    notice,
+    setNotice,
+    locationLabel,
+    initialize,
+    add,
+    setQuantity,
+    selectStore,
+    checkout,
+    locate,
+    geolocate,
+  };
+}

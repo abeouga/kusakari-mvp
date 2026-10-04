@@ -1,0 +1,33 @@
+{
+  "name": "kusakari",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "frontend"
+  ],
+  "scripts": {
+    "dev:web": "npm --workspace frontend run dev",
+    "dev:api": "node scripts/api.mjs dev",
+    "build:api": "node scripts/api.mjs build",
+    "build:web": "npm --workspace frontend run build",
+    "typecheck": "tsc -p frontend/jsconfig.json",
+    "lint": "eslint frontend/src scripts e2e *.js",
+    "check": "npm run typecheck && npm run lint && npm run build:web && npm run build:api",
+    "test:e2e": "playwright test",
+    "format": "prettier --write frontend/src backend/src/main/java scripts/*.mjs e2e/*.js *.js",
+    "format:check": "prettier --check frontend/src backend/src/main/java scripts/*.mjs e2e/*.js *.js"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@playwright/test": "1.63.0",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "eslint": "10.11.0",
+    "eslint-plugin-react-hooks": "7.1.1",
+    "globals": "17.12.0",
+    "prettier": "3.9.9",
+    "prettier-plugin-java": "2.11.0",
+    "typescript": "6.0.3"
+  }
+}

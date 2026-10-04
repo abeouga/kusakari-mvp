@@ -1,0 +1,80 @@
+@media (max-width: 700px) {
+  .dialog {
+    padding: 19px;
+  }
+  .dialog-heading h2 {
+    font-size: 18px;
+  }
+  .product-detail {
+    grid-template-columns: 1fr;
+    gap: 22px;
+  }
+  .product-detail > img {
+    max-height: 280px;
+    object-position: center 53%;
+  }
+  .product-detail h3 {
+    font-size: 22px;
+  }
+  .product-detail .detail-description {
+    margin: 15px 0;
+  }
+  .store-card {
+    padding: 14px;
+  }
+  .store-title {
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .store-title h3 {
+    font-size: 13px;
+  }
+  .store-title > strong {
+    font-size: 12px;
+  }
+  .store-title .pill {
+    font-size: 8px;
+  }
+  .location-controls {
+    gap: 10px;
+  }
+  .location-controls button {
+    font-size: 10px;
+    padding: 12px;
+    gap: 6px;
+  }
+  .cart-line {
+    gap: 12px;
+  }
+  .cart-line > img {
+    width: 60px;
+    height: 84px;
+  }
+  .cart-line h3 {
+    font-size: 12px;
+  }
+  .cart-line-end strong {
+    font-size: 13px;
+  }
+  .order-summary {
+    padding: 16px;
+  }
+  .order-label {
+    font-size: 8px;
+  }
+  .material-candidate {
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .material-candidate strong {
+    font-size: 12px;
+  }
+  .material-candidate button {
+    padding: 8px;
+    font-size: 9px;
+  }
+  .material-candidate img {
+    width: 43px;
+    height: 60px;
+  }
+}

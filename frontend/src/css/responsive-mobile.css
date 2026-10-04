@@ -1,0 +1,290 @@
+@media (max-width: 700px) {
+  .announcement {
+    height: 29px;
+    justify-content: center;
+    font-size: 9px;
+  }
+  .announcement span:first-child,
+  .announcement span:last-child {
+    display: none;
+  }
+  .site-header {
+    height: 74px;
+    justify-content: space-between;
+    gap: 10px;
+  }
+  .brand {
+    font-size: 31px;
+  }
+  .brand svg {
+    width: 26px;
+  }
+  .site-header nav {
+    display: none;
+  }
+  .history-button {
+    font-size: 10px;
+  }
+  .header-actions {
+    gap: 12px;
+  }
+  .bag-text {
+    display: none;
+  }
+  .hero {
+    grid-template-columns: 1fr 1fr;
+    min-height: 460px;
+  }
+  .hero-copy {
+    padding: 34px 6% 25px 9%;
+  }
+  .hero .eyebrow {
+    font-size: 7px;
+    letter-spacing: 1px;
+    gap: 7px;
+    margin-bottom: 21px;
+  }
+  .tiny-line {
+    width: 14px;
+  }
+  .hero h1 {
+    font-size: clamp(28px, 8.2vw, 38px);
+    letter-spacing: 2px;
+    line-height: 1.55;
+    margin-bottom: 18px;
+  }
+  .hero-description {
+    font-size: 10px;
+    letter-spacing: 0.2px;
+    line-height: 2.05;
+    margin-bottom: 22px;
+  }
+  .hero-button {
+    font-size: 9px;
+    padding: 12px 10px;
+    gap: 7px;
+    min-height: 42px;
+  }
+  .hero-button svg {
+    width: 13px;
+  }
+  .hero-footnote {
+    font-size: 6px;
+    letter-spacing: 1px;
+    margin-top: 28px;
+  }
+  .hero-product-label {
+    left: 10px;
+    right: 10px;
+    bottom: 15px;
+    padding: 12px;
+  }
+  .hero-product-label small {
+    font-size: 6px;
+    letter-spacing: 0.7px;
+  }
+  .hero-product-label strong {
+    font-size: 13px;
+    display: block;
+  }
+  .hero-product-label em {
+    font-size: 10px;
+  }
+  .hero-product-label svg {
+    width: 18px;
+  }
+  .vertical-caption {
+    font-size: 7px;
+    right: 9px;
+    top: 18px;
+  }
+  .hero-stamp {
+    left: 10px;
+    top: 18px;
+    font-size: 7px;
+    padding: 8px;
+    letter-spacing: 1px;
+  }
+  .hero-stamp svg {
+    width: 18px;
+  }
+  .hero-visual > img {
+    object-position: 52% center;
+  }
+  .benefits {
+    padding: 16px 4%;
+    gap: 0;
+    justify-content: space-between;
+  }
+  .benefits span {
+    font-size: 8px;
+    gap: 5px;
+  }
+  .benefits svg {
+    width: 15px;
+  }
+  .catalog {
+    padding-top: 40px;
+  }
+  .section-heading h2 {
+    font-size: 22px;
+    letter-spacing: 1px;
+  }
+  .section-heading > p {
+    display: none;
+  }
+  .section-heading .eyebrow {
+    font-size: 9px;
+  }
+  .store-strip {
+    font-size: 10px;
+    padding: 12px 10px;
+    margin-bottom: 20px;
+  }
+  .store-strip > span {
+    gap: 6px;
+  }
+  .store-strip button {
+    font-size: 9px;
+    gap: 4px;
+  }
+  .store-strip small {
+    font-size: 9px;
+  }
+  .catalog-controls {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 15px;
+    padding-bottom: 16px;
+  }
+  .categories {
+    justify-content: space-between;
+    gap: 3px;
+  }
+  .categories button {
+    font-size: 11px;
+    flex: 1;
+    padding: 9px 4px;
+  }
+  .search-input input {
+    width: 100%;
+  }
+  .search-input {
+    height: 38px;
+  }
+  .catalog-meta {
+    font-size: 9px;
+    gap: 6px;
+  }
+  .catalog-meta > div {
+    gap: 8px;
+  }
+  .catalog-meta small {
+    display: none;
+  }
+  .stock-filter {
+    font-size: 9px;
+  }
+  .product-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 29px 15px;
+  }
+  .product-badge {
+    font-size: 8px;
+    top: 9px;
+    left: 9px;
+    padding: 4px 7px;
+  }
+  .product-meta {
+    font-size: 8px;
+    margin-top: 13px;
+  }
+  .product-name {
+    font-size: 14px;
+  }
+  .latin {
+    font-size: 11px;
+  }
+  .product-bottom {
+    margin-top: 12px;
+    padding-top: 10px;
+  }
+  .price {
+    font-size: 15px;
+  }
+  .catalog-note {
+    font-size: 8px;
+    line-height: 1.8;
+  }
+  .material-banner {
+    flex-wrap: wrap;
+    padding-block: 27px;
+    gap: 18px;
+  }
+  .material-illustration {
+    width: 66px;
+    height: 104px;
+  }
+  .material-illustration svg {
+    width: 33px;
+  }
+  .material-illustration span {
+    font-size: 6px;
+  }
+  .material-banner h2 {
+    font-size: 18px;
+    letter-spacing: 0.5px;
+  }
+  .material-banner .eyebrow {
+    font-size: 7px;
+    letter-spacing: 1px;
+  }
+  .material-banner p:not(.eyebrow) {
+    font-size: 10px;
+  }
+  .material-banner > button {
+    margin: 0 0 0 84px;
+    font-size: 10px;
+  }
+  .editorial {
+    padding-block: 45px;
+    grid-template-columns: 1fr;
+    gap: 22px;
+  }
+  .editorial h2 {
+    font-size: 25px;
+  }
+  .editorial > div:last-child {
+    padding-left: 0;
+  }
+  .editorial p:not(.eyebrow) {
+    font-size: 11px;
+  }
+  .footer-links {
+    gap: 17px;
+  }
+  .footer-links button {
+    font-size: 10px;
+  }
+  .footer-bottom {
+    font-size: 7px;
+  }
+  .toast {
+    font-size: 11px;
+    gap: 10px;
+    padding: 13px;
+    min-width: 330px;
+  }
+  .toast button {
+    font-size: 10px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition: none !important;
+    animation: none !important;
+  }
+}
