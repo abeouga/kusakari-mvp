@@ -218,7 +218,24 @@ function Initialize-Database([string]$mode, [switch]$reconfigure) {
             $stateRoot = if ($env:KUSAKARI_MYSQL_HOME) { $env:KUSAKARI_MYSQL_HOME } else { Join-Path $env:LOCALAPPDATA 'Kusakari\mysql' }
             $stateFile = Join-Path $stateRoot 'instance.json'
             if (Test-Path -LiteralPath $stateFile) {
-                $null = Start-ManagedMySql
+                $state = Get-Content -Raw -LiteralPath $stateFile | ConvertFrom-Json
+                if ($state.Ready) {
+                    $null = Start-ManagedMySql
+                } else {
+                    # A copied or interrupted setup can leave Ready=false. If
+                    # the reset script prepared an existing MySQL on 3306,
+                    # reuse that verified server instead of trusting the stale
+                    # managed state. Never switch without a successful probe.
+                    $existingProbe = $null
+                    if (Test-LocalPort 3306) {
+                        $existingProbe = Invoke-MySql 'root' 'password' 3306 'SELECT VERSION();' -AllowFailure
+                    }
+                    if ($existingProbe -and $existingProbe.Success) {
+                        Write-Host '未完了の専用MySQLを検出しました。root/passwordで確認できた既存MySQL (3306) を使用します。'
+                        return Initialize-Database 'existing' -reconfigure
+                    }
+                    throw '専用MySQLの初期化が未完了です。保存先を確認してください。空パスワードでは継続しません。'
+                }
             } else {
                 # An older or copied .env may point to the managed mode before
                 # this machine has created its Kusakari-owned instance. Reuse
