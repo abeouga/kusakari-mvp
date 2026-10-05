@@ -62,14 +62,14 @@ docs/               設計判断、API、画像プロンプト、検証記録
 
 ## 別環境でのセットアップ
 
-Windows 10/11 x64で `setup.bat` を実行し、端末からMySQL方式・接続ポート・管理者名・管理者パスワード・アプリ用ユーザー・パスワードを入力します。`.env` の手動作成は不要です。
-MySQLがないPCでは `managed` を選び、Kusakari専用のローカルMySQLを用意できます。
+Windows 10/11 x64のWindows PowerShell 5.1で `setup.bat` を実行します。`127.0.0.1:3306` のMySQLがあれば自動使用し、rootパスワードが`password`と異なる場合だけ非表示入力します。MySQLがなければKusakari専用MySQLを`3307`で自動準備します。`.env` の手動作成は不要です。
+アプリ用ユーザー・DBポート・アプリ用パスワード（`password`）は自動設定します。
 不足するNode.js LTS、JDK 21、.NET 10 SDKをユーザー領域に取得し、依存・API・Web・SysOverRayをビルドします。
 開発/E2E DBに対する認証・Flyway・実API起動が成功したら `start.bat` で起動します。
 
-通常の再実行は保存済み資格情報を使用します。設定変更は `setup.bat -Reconfigure` です。
+通常の再実行は保存済み資格情報を使用します。設定を作り直す場合だけ `setup.bat -Reconfigure` を使います。
 パスワードは非表示入力で、既存MySQLの管理者パスワードは保存しません。
-既存データと既存ユーザーのパスワードは上書きしません。
+既存データは削除しません。`kusakari@localhost` はローカルデモ用アカウントとしてパスワードを`password`へ揃えます。
 別PCへ `.env`、`.runtime`、DBデータをコピーせず、そのPCでセットアップしてください。
 手順と制約は [docs/windows-setup.md](docs/windows-setup.md) を参照してください。
 

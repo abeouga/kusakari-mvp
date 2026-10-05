@@ -2,7 +2,6 @@
 
 function Get-KusakariMySqlBin {
   param([switch]$Portable)
-  $installed = Get-Command mysqld.exe -ErrorAction SilentlyContinue | Select-Object -First 1
   $candidates = @()
   $stateRoot = if ($env:KUSAKARI_MYSQL_HOME) { $env:KUSAKARI_MYSQL_HOME } else { Join-Path $env:LOCALAPPDATA 'Kusakari\mysql' }
   $stateFile = Join-Path $stateRoot 'instance.json'
@@ -10,19 +9,41 @@ function Get-KusakariMySqlBin {
     $state = Get-Content -Raw -LiteralPath $stateFile | ConvertFrom-Json
     $candidates += Split-Path -Parent $state.executable
   }
-  if (-not $Portable) {
-    if ($null -ne $installed) { $candidates += Split-Path -Parent $installed.Source }
-    foreach ($version in @('8.4', '8.0')) {
-      $candidates += Join-Path $env:ProgramFiles "MySQL\MySQL Server $version\bin"
-    }
-  }
   $version = '8.4.11'
   $tools = Join-Path $env:LOCALAPPDATA "Kusakari\tools\mysql-$version-winx64"
   $candidates += Join-Path $tools 'bin'
+
+  # Reuse any compatible extracted MySQL before considering an archive or a
+  # network download. This includes Greenly's user-scoped tools and normal
+  # MySQL installations, so the two projects do not download the same ZIP.
+  $installed = Get-Command mysqld.exe -ErrorAction SilentlyContinue | Select-Object -First 1
+  if ($null -ne $installed) { $candidates += Split-Path -Parent $installed.Source }
+  $programFilesX86 = [Environment]::GetEnvironmentVariable('ProgramFiles(x86)')
+  $searchRoots = @(
+    (Join-Path $env:ProgramFiles 'MySQL'),
+    $(if ($programFilesX86) { Join-Path $programFilesX86 'MySQL' }),
+    (Join-Path $env:LOCALAPPDATA 'Kusakari\tools'),
+    (Join-Path $env:LOCALAPPDATA 'Greenly\tools'),
+    (Join-Path $env:USERPROFILE 'mysql'),
+    (Join-Path $env:USERPROFILE 'Downloads')
+  ) | Where-Object { $_ -and (Test-Path -LiteralPath $_ -PathType Container) }
+  foreach ($root in $searchRoots) {
+    $candidates += Get-ChildItem -LiteralPath $root -Filter 'mysqld.exe' -File -Recurse -ErrorAction SilentlyContinue |
+      Where-Object { $_.DirectoryName -match '\\bin$' } |
+      Select-Object -ExpandProperty DirectoryName
+  }
+
+  $seen = @{}
   foreach ($candidate in $candidates) {
-    if ((Test-Path -LiteralPath (Join-Path $candidate 'mysqld.exe')) -and
-        (Test-Path -LiteralPath (Join-Path $candidate 'mysqldump.exe'))) {
-      return $candidate
+    if ([string]::IsNullOrWhiteSpace($candidate)) { continue }
+    $resolvedCandidate = [IO.Path]::GetFullPath($candidate).TrimEnd('\')
+    if ($seen.ContainsKey($resolvedCandidate)) { continue }
+    $seen[$resolvedCandidate] = $true
+    if ((Test-Path -LiteralPath (Join-Path $resolvedCandidate 'mysqld.exe')) -and
+        (Test-Path -LiteralPath (Join-Path $resolvedCandidate 'mysql.exe')) -and
+        (Test-Path -LiteralPath (Join-Path $resolvedCandidate 'mysqldump.exe'))) {
+      Write-Host "既存のMySQL実行ファイルを再利用します: $resolvedCandidate"
+      return $resolvedCandidate
     }
   }
 
@@ -33,7 +54,20 @@ function Get-KusakariMySqlBin {
   New-Item -ItemType Directory -Path $downloads -Force | Out-Null
   $archive = Join-Path $downloads "mysql-$version-winx64.zip"
   $expected = 'A492371D687D2BAB088B0062581144A0044B8964BAEFDF4FAA579292B423D25C'
-  if (-not (Test-Path -LiteralPath $archive)) {
+  $archiveCandidates = @(
+    $archive,
+    (Join-Path $env:LOCALAPPDATA "Greenly\downloads\mysql-$version-winx64.zip"),
+    (Join-Path $env:USERPROFILE "Downloads\mysql-$version-winx64.zip"),
+    (Join-Path $PSScriptRoot "..\tools\mysql-$version-winx64.zip")
+  ) | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } | Select-Object -Unique
+  $existingArchive = $archiveCandidates | Select-Object -First 1
+  if ($existingArchive) {
+    if ((Get-FileHash -LiteralPath $existingArchive -Algorithm SHA256).Hash -ine $expected) {
+      throw "既存のMySQL ZIPのSHA-256が一致しません。ファイルを確認してください: $existingArchive"
+    }
+    $archive = $existingArchive
+    Write-Host "既存のMySQL ZIPを再利用します: $archive"
+  } else {
     Write-Host "Kusakari専用MySQL ${version}を公式配布元から取得します。"
     $partial = "$archive.part"
     $uri = "https://cdn.mysql.com/Downloads/MySQL-8.4/mysql-$version-winx64.zip"
@@ -44,9 +78,9 @@ function Get-KusakariMySqlBin {
       Invoke-WebRequest -UseBasicParsing -Uri $uri -OutFile $partial -TimeoutSec 900
     }
     Move-Item -LiteralPath $partial -Destination $archive -Force
-  }
-  if ((Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash -ne $expected) {
-    throw "MySQL配布物のSHA-256が一致しません。取得ファイルを確認してください: $archive"
+    if ((Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash -ne $expected) {
+      throw "MySQL配布物のSHA-256が一致しません。取得ファイルを確認してください: $archive"
+    }
   }
 
   $stage = Join-Path $downloads ('mysql-extract-' + [guid]::NewGuid().ToString('N'))
@@ -61,6 +95,7 @@ function Get-KusakariMySqlBin {
       }
     }
     if (Test-Path -LiteralPath $tools) { throw "MySQLの展開先が既に存在します。既存ファイルを確認してください: $tools" }
+    New-Item -ItemType Directory -Path (Split-Path -Parent $tools) -Force | Out-Null
     Move-Item -LiteralPath $source -Destination $tools
   } finally {
     $resolvedStage = [IO.Path]::GetFullPath($stage)

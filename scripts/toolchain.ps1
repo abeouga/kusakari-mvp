@@ -10,7 +10,13 @@ function Import-Toolchain {
         $tools = Get-Content -Raw -LiteralPath $settings | ConvertFrom-Json
         foreach ($directory in @($tools.Node, $tools.Java, $tools.Dotnet, $tools.MySql)) { Add-ToolPath $directory }
         if (Test-Path -LiteralPath (Join-Path $tools.Java 'javac.exe')) { $env:JAVA_HOME = Split-Path $tools.Java -Parent }
-        if ($tools.Dotnet) { $env:DOTNET_ROOT = $tools.Dotnet; $env:DOTNET_ROOT_X64 = $tools.Dotnet }
+        if ($tools.DotnetDesktop -and (Test-Path -LiteralPath (Join-Path $tools.DotnetDesktop 'dotnet.exe'))) {
+            $env:DOTNET_ROOT = $tools.DotnetDesktop
+            $env:DOTNET_ROOT_X64 = $tools.DotnetDesktop
+        } elseif ($tools.Dotnet -and (Test-Path -LiteralPath (Join-Path $tools.Dotnet 'dotnet.exe'))) {
+            $env:DOTNET_ROOT = $tools.Dotnet
+            $env:DOTNET_ROOT_X64 = $tools.Dotnet
+        }
     }
 }
 
@@ -113,7 +119,35 @@ function Initialize-Toolchain {
         Add-ToolPath $directory
         $env:DOTNET_ROOT = $directory; $env:DOTNET_ROOT_X64 = $directory
     }
-    $tools = @{ Node = Split-Path (Get-Command node.exe).Source -Parent; Java = $javaBin; Dotnet = Split-Path (Get-Command dotnet.exe).Source -Parent }
+    $dotnet = Get-Command dotnet.exe -ErrorAction SilentlyContinue | Select-Object -First 1
+    if (-not $dotnet) { throw '.NET SDKの実行ファイルを特定できません。' }
+    $runtimes = & $dotnet.Source --list-runtimes
+    $dotnetDesktop = $null
+    if (-not (@($runtimes | Where-Object { $_ -match '^Microsoft\.WindowsDesktop\.App 10\.' }).Count -gt 0)) {
+        $metadata = Invoke-RestMethod 'https://builds.dotnet.microsoft.com/dotnet/release-metadata/10.0/releases.json' -TimeoutSec 30
+        $release = $metadata.releases | Select-Object -First 1
+        $file = $release.windowsdesktop.files | Where-Object { $_.rid -eq 'win-x64' -and $_.name -like '*.zip' } | Select-Object -First 1
+        if (-not $file.hash) { throw '.NET Windows Desktop Runtime配布情報を取得できません。' }
+        $dotnetDesktop = Join-Path $toolsRoot 'dotnet-desktop-10'
+        $desktopExecutable = Join-Path $dotnetDesktop 'dotnet.exe'
+        $desktopReady = $false
+        if (Test-Path -LiteralPath $desktopExecutable) {
+            $desktopRuntimes = & $desktopExecutable --list-runtimes 2>$null
+            $desktopReady = @($desktopRuntimes | Where-Object { $_ -match '^Microsoft\.WindowsDesktop\.App 10\.' }).Count -gt 0
+        }
+        if (-not $desktopReady) {
+            Expand-ToolArchive (Get-VerifiedArchive $file.url $file.hash 'SHA512') $dotnetDesktop
+            if (-not (Test-Path -LiteralPath $desktopExecutable)) { throw '.NET Windows Desktop Runtimeの展開後確認に失敗しました。' }
+            $desktopRuntimes = & $desktopExecutable --list-runtimes 2>$null
+            if (-not (@($desktopRuntimes | Where-Object { $_ -match '^Microsoft\.WindowsDesktop\.App 10\.' }).Count -gt 0)) {
+                throw '.NET Windows Desktop Runtime 10の導入確認に失敗しました。'
+            }
+        }
+        $env:DOTNET_ROOT = $dotnetDesktop
+        $env:DOTNET_ROOT_X64 = $dotnetDesktop
+    }
+    $tools = @{ Node = Split-Path (Get-Command node.exe).Source -Parent; Java = $javaBin; Dotnet = Split-Path $dotnet.Source -Parent }
+    if ($dotnetDesktop) { $tools.DotnetDesktop = $dotnetDesktop }
     New-Item -ItemType Directory -Path (Join-Path $projectRoot '.runtime') -Force | Out-Null
     $tools | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $projectRoot '.runtime\toolchain.json') -Encoding UTF8
     Write-Host 'Node.js・Java JDK・.NET SDKの準備を確認しました。'

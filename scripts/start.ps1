@@ -7,7 +7,22 @@ Import-LocalSettings
 New-Item -ItemType Directory -Path $runtimeDir -Force | Out-Null
 . "$PSScriptRoot\database.ps1"
 $mysqlBin = Get-KusakariMySqlBin -Portable:($env:KUSAKARI_DATABASE_MODE -eq 'managed')
-if ($env:KUSAKARI_DATABASE_MODE -eq 'managed') { $null = Start-ManagedMySql }
+if ($env:KUSAKARI_DATABASE_MODE -eq 'managed') {
+    $stateRoot = if ($env:KUSAKARI_MYSQL_HOME) { $env:KUSAKARI_MYSQL_HOME } else { Join-Path $env:LOCALAPPDATA 'Kusakari\mysql' }
+    $stateFile = Join-Path $stateRoot 'instance.json'
+    if (Test-Path -LiteralPath $stateFile) {
+        $null = Start-ManagedMySql
+    } else {
+        # A copied .env can exist before this machine has created its managed
+        # instance. Prepare it from the already discovered MySQL binaries so
+        # start.bat remains a one-step entry point.
+        Write-Host '既存のMySQL実行ファイルでKusakari専用MySQLを初期化します。'
+        Initialize-KusakariMySqlRuntime $mysqlBin
+        $null = Initialize-ManagedMySql ([int]$env:KUSAKARI_DB_PORT)
+        # Provision the application user and schemas for this newly created DB.
+        Initialize-Database 'managed' -reconfigure
+    }
+}
 $null = Invoke-MySql $env:KUSAKARI_DB_USER $env:KUSAKARI_DB_PASSWORD ([int]$env:KUSAKARI_DB_PORT) 'USE kusakari; SELECT 1;'
 
 $jar = Join-Path $projectRoot 'backend\target\kusakari-api-0.1.0.jar'

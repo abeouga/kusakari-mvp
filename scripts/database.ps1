@@ -48,7 +48,7 @@ function Invoke-MySql([string]$user, [string]$password, [int]$port, [string]$sql
         $code = [regex]::Match($errorText, 'ERROR (\d+)').Groups[1].Value
         if ($process.ExitCode -ne 0 -and -not $AllowFailure) {
             $hint = switch ($code) {
-                '1045' { 'ユーザー名・パスワードを確認してください。既存ユーザーのパスワードは変更しません。' }
+                '1045' { 'ユーザー名・パスワードを確認してください。Kusakariのアプリユーザーはpasswordで接続します。' }
                 '1044' { '対象DBへの権限が不足しています。管理者ユーザーを確認してください。' }
                 '2003' { 'MySQLの起動状態・ポートを確認してください。' }
                 default { '接続設定・権限・DB構造を確認してください。' }
@@ -68,6 +68,16 @@ function Test-LocalPort([int]$port) {
     catch { return $false } finally { $client.Dispose() }
 }
 
+function Test-ManagedMySqlProcess([int]$processId, [string]$executable, [string]$config) {
+    $process = Get-CimInstance Win32_Process -Filter "ProcessId=$processId" -ErrorAction SilentlyContinue
+    if (-not $process -or [string]::IsNullOrWhiteSpace($process.ExecutablePath) -or [string]::IsNullOrWhiteSpace($process.CommandLine)) { return $false }
+    try {
+        $sameExecutable = [IO.Path]::GetFullPath($process.ExecutablePath) -ieq [IO.Path]::GetFullPath($executable)
+        $sameConfig = ([string]$process.CommandLine) -match [regex]::Escape([IO.Path]::GetFullPath($config))
+        return $sameExecutable -and $sameConfig
+    } catch { return $false }
+}
+
 function Start-ManagedMySqlCore {
     $stateRoot = if ($env:KUSAKARI_MYSQL_HOME) { $env:KUSAKARI_MYSQL_HOME } else { Join-Path $env:LOCALAPPDATA 'Kusakari\mysql' }
     $stateFile = Join-Path $stateRoot 'instance.json'
@@ -77,8 +87,13 @@ function Start-ManagedMySqlCore {
     if (Test-LocalPort $state.Port) {
         $result = Invoke-MySql 'root' (Get-ManagedPassword $stateRoot) $state.Port 'SELECT @@datadir;' -AllowFailure
         $actual = if ($result.Success) { [IO.Path]::GetFullPath($result.Output).TrimEnd('\') } else { '' }
-        if ($actual -ine [IO.Path]::GetFullPath((Join-Path $stateRoot 'data')).TrimEnd('\')) { throw '専用MySQLのポートを別サーバーが使用中です。' }
-        return $state
+        $expectedData = [IO.Path]::GetFullPath((Join-Path $stateRoot 'data')).TrimEnd('\')
+        if ($actual -ieq $expectedData) { return $state }
+        $config = Join-Path $stateRoot 'my.ini'
+        $listener = @(Get-NetTCPConnection -LocalPort $state.Port -State Listen -ErrorAction SilentlyContinue |
+            Where-Object { Test-ManagedMySqlProcess ([int]$_.OwningProcess) $state.Executable $config })
+        if ($listener.Count -gt 0) { return $state }
+        throw '専用MySQLのポートを別サーバーが使用中です。'
     }
     $config = Join-Path $stateRoot 'my.ini'
     $process = Start-Process -FilePath $state.Executable -ArgumentList "--defaults-file=`"$config`"" -WindowStyle Hidden -PassThru
@@ -100,11 +115,55 @@ function Initialize-ManagedMySqlCore([int]$port) {
     $stateRoot = if ($env:KUSAKARI_MYSQL_HOME) { $env:KUSAKARI_MYSQL_HOME } else { Join-Path $env:LOCALAPPDATA 'Kusakari\mysql' }
     New-Item -ItemType Directory -Path $stateRoot -Force | Out-Null
     if (Test-Path -LiteralPath (Join-Path $stateRoot 'instance.json')) { return Start-ManagedMySqlCore }
+    if (Test-LocalPort $port) {
+        # A failed first setup can leave the Kusakari data directory running
+        # without its state file. Stop it only after verifying the server's
+        # datadir; never shut down an unrelated MySQL on the same port.
+        $expectedData = [IO.Path]::GetFullPath((Join-Path $stateRoot 'data')).TrimEnd('\')
+        $managedPassword = 'password'
+        $secret = Join-Path $stateRoot 'admin.secret'
+        if (Test-Path -LiteralPath $secret -PathType Leaf) {
+            try { $managedPassword = Get-ManagedPassword $stateRoot } catch {}
+        }
+        $probe = Invoke-MySql 'root' $managedPassword $port 'SELECT @@datadir;' -AllowFailure
+        $actualData = if ($probe.Success) { [IO.Path]::GetFullPath($probe.Output).TrimEnd('\') } else { '' }
+        if ($actualData -ieq $expectedData) {
+            Write-Host '既存のKusakari専用MySQLを停止して初期化を続行します。'
+            $null = Invoke-MySql 'root' $managedPassword $port 'SHUTDOWN;' -AllowFailure
+            $deadline = (Get-Date).AddSeconds(20)
+            while (Test-LocalPort $port) {
+                if ((Get-Date) -gt $deadline) { throw '既存のKusakari専用MySQLを停止できません。' }
+                Start-Sleep -Milliseconds 300
+            }
+        } else {
+            $config = Join-Path $stateRoot 'my.ini'
+            $listener = @(Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue |
+                Where-Object { Test-ManagedMySqlProcess ([int]$_.OwningProcess) (Join-Path $mysqlBin 'mysqld.exe') $config })
+            foreach ($entry in $listener) { Stop-Process -Id $entry.OwningProcess -Force -ErrorAction Stop }
+            $deadline = (Get-Date).AddSeconds(20)
+            while ($listener.Count -gt 0 -and (Test-LocalPort $port)) {
+                if ((Get-Date) -gt $deadline) { throw '既存のKusakari専用MySQLを停止できません。' }
+                Start-Sleep -Milliseconds 300
+            }
+        }
+    }
     if (Test-LocalPort $port) { throw '専用MySQL用ポートが使用中です。空いているポートを指定してください。' }
     $data = Join-Path $stateRoot 'data'
-    if (Test-Path -LiteralPath $data) { throw '初期化途中のMySQLデータがあります。既存データを自動削除しません。保存先を確認してください。' }
-    $adminPassword = Read-Password '専用MySQL rootパスワード（新規作成・非表示）'
-    if ([string]::IsNullOrEmpty($adminPassword)) { throw '専用MySQLのrootパスワードは空にできません。' }
+    if (Test-Path -LiteralPath $data) {
+        $config = Join-Path $stateRoot 'my.ini'
+        $secret = Join-Path $stateRoot 'admin.secret'
+        if ((Test-Path -LiteralPath $config -PathType Leaf) -and (Test-Path -LiteralPath $secret -PathType Leaf)) {
+            # Recover a valid Kusakari data directory when only instance.json
+            # was lost. Existing data is retained and the server is restarted.
+            $state = @{ Executable = Join-Path $mysqlBin 'mysqld.exe'; Port = $port; Ready = $true }
+            Set-PrivateFile (Join-Path $stateRoot 'instance.json') ($state | ConvertTo-Json)
+            return Start-ManagedMySqlCore
+        }
+        throw '初期化途中のMySQLデータがあります。既存データを自動削除しません。保存先を確認してください。'
+    }
+    # A managed instance is Kusakari-owned, so its credentials are generated
+    # automatically. No setup prompt is needed for this path.
+    $adminPassword = 'password'
     $secure = ConvertTo-SecureString $adminPassword -AsPlainText -Force
     Set-PrivateFile (Join-Path $stateRoot 'admin.secret') ($secure | ConvertFrom-SecureString)
     $ini = "[mysqld]`nbasedir=$((Split-Path $mysqlBin -Parent).Replace('\','/'))`ndatadir=$($data.Replace('\','/'))`nbind-address=127.0.0.1`nport=$port`nmysqlx=0`nskip-log-bin`nlog-error=$((Join-Path $stateRoot 'mysql-error.log').Replace('\','/'))`n"
@@ -147,44 +206,77 @@ function Initialize-ManagedMySql([int]$port) { return Invoke-ManagedLifecycle $p
 
 function Initialize-Database([string]$mode, [switch]$reconfigure) {
     $settings = Join-Path $projectRoot '.env'
+    if ($reconfigure -and $mode -eq 'auto' -and (Test-Path -LiteralPath $settings)) {
+        $savedMode = Select-String -LiteralPath $settings -Pattern '^KUSAKARI_DATABASE_MODE=(existing|managed)$' | Select-Object -First 1
+        if ($savedMode) { $mode = $savedMode.Matches[0].Groups[1].Value }
+    }
     if ((Test-Path -LiteralPath $settings) -and -not $reconfigure) {
         Import-LocalSettings
         $port = [int]$env:KUSAKARI_DB_PORT
         $script:mysqlBin = Get-KusakariMySqlBin -Portable:($env:KUSAKARI_DATABASE_MODE -eq 'managed')
-        if ($env:KUSAKARI_DATABASE_MODE -eq 'managed') { $null = Start-ManagedMySql }
+        if ($env:KUSAKARI_DATABASE_MODE -eq 'managed') {
+            $stateRoot = if ($env:KUSAKARI_MYSQL_HOME) { $env:KUSAKARI_MYSQL_HOME } else { Join-Path $env:LOCALAPPDATA 'Kusakari\mysql' }
+            $stateFile = Join-Path $stateRoot 'instance.json'
+            if (Test-Path -LiteralPath $stateFile) {
+                $null = Start-ManagedMySql
+            } else {
+                # An older or copied .env may point to the managed mode before
+                # this machine has created its Kusakari-owned instance. Reuse
+                # the discovered MySQL binaries and initialize it automatically.
+                Write-Host '既存のMySQL実行ファイルでKusakari専用MySQLを初期化します。'
+                Initialize-KusakariMySqlRuntime $script:mysqlBin
+                $null = Initialize-ManagedMySql $port
+                # The new instance has no application user or schemas yet.
+                # Re-enter the provisioning path without asking for settings.
+                return Initialize-Database 'managed' -reconfigure
+            }
+        }
         $user = $env:KUSAKARI_DB_USER; $password = $env:KUSAKARI_DB_PASSWORD
         Write-Host '保存済みのDB接続設定を検証します。変更する場合は setup.bat -Reconfigure を実行してください。'
     } else {
-        if ($mode -eq 'auto') { $mode = Read-Setting 'MySQL方式: existing=既存 / managed=Kusakari専用' 'existing' }
-        if ($mode -notin @('existing','managed')) { throw 'MySQL方式はexistingまたはmanagedを指定してください。' }
-        $script:mysqlBin = Get-KusakariMySqlBin -Portable:($mode -eq 'managed')
-        if ($mode -eq 'managed') {
+        # Automatic local defaults: use an already-running MySQL on 3306;
+        # otherwise create/reuse a Kusakari-owned instance on 3307.
+        $existing = Test-LocalPort 3306
+        if ($mode -eq 'managed') { $existing = $false }
+        if ($mode -eq 'existing') { $existing = $true }
+        if ($existing) {
+            $mode = 'existing'
+            $port = 3306
+            $script:mysqlBin = Get-KusakariMySqlBin
+            $adminUser = 'root'
+            # The local convention is password. Ask only when an existing
+            # server has a different root credential.
+            $adminPassword = 'password'
+            $probe = Invoke-MySql $adminUser $adminPassword $port 'SELECT VERSION();' -AllowFailure
+            if (-not $probe.Success) {
+                $adminPassword = Read-Password 'MySQL rootパスワード（非表示）'
+                $null = Invoke-MySql $adminUser $adminPassword $port 'SELECT VERSION();'
+            }
+        } else {
+            $mode = 'managed'
+            $script:mysqlBin = Get-KusakariMySqlBin -Portable
             Initialize-KusakariMySqlRuntime $mysqlBin
-            $portText = Read-Setting '専用MySQLポート' '3307'
-        } else {
-            $hostName = Read-Setting 'MySQLホスト（ローカルデモ専用）' '127.0.0.1'
-            if ($hostName -ne '127.0.0.1') { throw '接続先は127.0.0.1に限定しています。' }
-            $portText = Read-Setting 'MySQLポート' '3306'
-        }
-        if ($portText -notmatch '^\d{1,5}$' -or [int]$portText -lt 1 -or [int]$portText -gt 65535) { throw 'ポートは1-65535の整数を入力してください。' }
-        $port = [int]$portText
-        if ($mode -eq 'managed') {
-            $state = Initialize-ManagedMySql $port
-            $port = [int]$state.Port; $adminUser = 'root'
+            $port = 3307
+            if (Test-Path -LiteralPath $settings) {
+                $savedManaged = Select-String -LiteralPath $settings -Pattern '^KUSAKARI_DATABASE_MODE=managed$' | Select-Object -First 1
+                $savedPort = Select-String -LiteralPath $settings -Pattern '^KUSAKARI_DB_PORT=(\d+)$' | Select-Object -First 1
+                if ($savedManaged -and $savedPort -and [int]$savedPort.Matches[0].Groups[1].Value -ge 1 -and [int]$savedPort.Matches[0].Groups[1].Value -le 65535) {
+                    $port = [int]$savedPort.Matches[0].Groups[1].Value
+                }
+            }
             $stateRoot = if ($env:KUSAKARI_MYSQL_HOME) { $env:KUSAKARI_MYSQL_HOME } else { Join-Path $env:LOCALAPPDATA 'Kusakari\mysql' }
+            if (Test-Path -LiteralPath (Join-Path $stateRoot 'instance.json')) {
+                $null = Start-ManagedMySql
+            } else {
+                $null = Initialize-ManagedMySql $port
+            }
+            $adminUser = 'root'
             $adminPassword = Get-ManagedPassword $stateRoot
-        } else {
-            $adminUser = Read-Setting 'MySQL管理者ユーザー' 'root'
-            if ($adminUser -notmatch '^[A-Za-z0-9_]{1,32}$') { throw '管理者ユーザー名は英数字とアンダースコアで指定してください。' }
-            $adminPassword = Read-Password 'MySQL管理者パスワード（非表示・保存しません）'
         }
-        $null = Invoke-MySql $adminUser $adminPassword $port 'SELECT VERSION();'
-        $user = Read-Setting 'Kusakariアプリ用DBユーザー（rootは不可）' 'kusakari'
-        if ($user -notmatch '^[A-Za-z0-9_]{1,32}$' -or $user -eq 'root') { throw 'アプリ用ユーザーはroot以外の英数字とアンダースコアで指定してください。' }
-        $password = Read-Password 'アプリ用DBパスワード（既存ユーザーは現在のパスワード）'
-        if ($password.Length -lt 1 -or $password.Length -gt 128 -or $password -match "['\r\n\x00]") { throw 'アプリ用パスワードは1-128文字、単一引用符と改行を除いて指定してください。' }
-        $count = (Invoke-MySql $adminUser $adminPassword $port "SELECT COUNT(*) FROM mysql.user WHERE User='$user';").Output
-        if ([int]$count -gt 0) { $null = Invoke-MySql $user $password $port 'SELECT 1;' }
+        $user = 'kusakari'
+        # This is a local demo account. Keep the application credential
+        # deterministic so another PC needs no extra DB-password prompt.
+        $password = 'password'
         # Reject unrelated existing schemas before provisioning users or grants.
         foreach ($db in @('kusakari','kusakari_e2e')) {
             $tables = (Invoke-MySql $adminUser $adminPassword $port "SELECT table_name FROM information_schema.tables WHERE table_schema='$db';").Output
@@ -197,7 +289,7 @@ function Initialize-Database([string]$mode, [switch]$reconfigure) {
             }
         }
         $literal = $password.Replace("'", "''")
-        $sql = "SET SESSION sql_mode='NO_BACKSLASH_ESCAPES'; CREATE USER IF NOT EXISTS '$user'@'localhost' IDENTIFIED BY '$literal';"
+        $sql = "SET SESSION sql_mode='NO_BACKSLASH_ESCAPES'; CREATE USER IF NOT EXISTS '$user'@'localhost' IDENTIFIED BY '$literal'; ALTER USER '$user'@'localhost' IDENTIFIED BY '$literal';"
         foreach ($db in @('kusakari','kusakari_e2e')) {
             $sql += "CREATE DATABASE IF NOT EXISTS $db CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci; GRANT SELECT,INSERT,UPDATE,DELETE,CREATE,ALTER,DROP,INDEX,REFERENCES ON $db.* TO '$user'@'localhost';"
         }
