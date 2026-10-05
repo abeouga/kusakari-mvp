@@ -78,12 +78,74 @@ function Test-ManagedMySqlProcess([int]$processId, [string]$executable, [string]
     } catch { return $false }
 }
 
+function Set-ManagedMySqlReady([string]$stateRoot, [object]$state, [string]$executable) {
+    $state.Executable = $executable
+    $state.Ready = $true
+    Set-PrivateFile (Join-Path $stateRoot 'instance.json') ($state | ConvertTo-Json)
+    return [pscustomobject]$state
+}
+
+function Recover-ManagedMySqlCore([string]$stateRoot, [object]$state) {
+    $config = Join-Path $stateRoot 'my.ini'
+    $data = Join-Path $stateRoot 'data'
+    if (-not (Test-Path -LiteralPath $config -PathType Leaf) -or -not (Test-Path -LiteralPath $data -PathType Container)) {
+        throw '専用MySQLの設定またはデータ保存先がありません。自動削除せず停止しました。'
+    }
+    $executable = if ($state.Executable -and (Test-Path -LiteralPath $state.Executable)) {
+        [IO.Path]::GetFullPath($state.Executable)
+    } else {
+        Join-Path $script:mysqlBin 'mysqld.exe'
+    }
+    if (-not (Test-Path -LiteralPath $executable -PathType Leaf)) { throw '専用MySQLの実行ファイルが見つかりません。' }
+    $port = [int]$state.Port
+    if ($port -lt 1 -or $port -gt 65535) { throw '専用MySQLのポート設定が不正です。' }
+    $expectedData = [IO.Path]::GetFullPath($data).TrimEnd('\')
+    $password = Get-ManagedPassword $stateRoot
+    $process = $null
+    $startedHere = $false
+    try {
+        if (-not (Test-LocalPort $port)) {
+            $process = Start-Process -FilePath $executable -ArgumentList "--defaults-file=`"$config`"" -WindowStyle Hidden -PassThru
+            $startedHere = $true
+            $deadline = (Get-Date).AddSeconds(40)
+            do {
+                if ($process.HasExited) { throw '専用MySQLの再開に失敗しました。Kusakari/mysqlのmysql-error.logを確認してください。' }
+                if (Test-LocalPort $port) { break }
+                Start-Sleep -Milliseconds 300
+            } while ((Get-Date) -lt $deadline)
+            if (-not (Test-LocalPort $port)) { throw '専用MySQLの再開確認がタイムアウトしました。' }
+        }
+        $probe = Invoke-MySql 'root' $password $port 'SELECT @@datadir;' -AllowFailure
+        $actualData = if ($probe.Success) { [IO.Path]::GetFullPath($probe.Output).TrimEnd('\') } else { '' }
+        if (-not $probe.Success -or $actualData -ine $expectedData) {
+            # The reset script may have stopped an instance immediately after
+            # its insecure initialization. Complete that private transition
+            # only when the server proves it owns Kusakari's data directory.
+            $emptyProbe = Invoke-MySql 'root' '' $port 'SELECT @@datadir;' -AllowFailure
+            $emptyData = if ($emptyProbe.Success) { [IO.Path]::GetFullPath($emptyProbe.Output).TrimEnd('\') } else { '' }
+            if ($emptyProbe.Success -and $emptyData -ieq $expectedData) {
+                $literal = $password.Replace("'", "''")
+                $null = Invoke-MySql 'root' '' $port "SET SESSION sql_mode='NO_BACKSLASH_ESCAPES'; ALTER USER 'root'@'localhost' IDENTIFIED BY '$literal';"
+                $probe = Invoke-MySql 'root' $password $port 'SELECT @@datadir;' -AllowFailure
+                $actualData = if ($probe.Success) { [IO.Path]::GetFullPath($probe.Output).TrimEnd('\') } else { '' }
+            }
+        }
+        if (-not $probe.Success -or $actualData -ine $expectedData) {
+            throw '専用MySQLのroot/password認証またはデータ保存先を確認できません。'
+        }
+        return Set-ManagedMySqlReady $stateRoot $state $executable
+    } catch {
+        if ($startedHere -and $process -and -not $process.HasExited) { try { Stop-Process -Id $process.Id -Force } catch {} }
+        throw
+    }
+}
+
 function Start-ManagedMySqlCore {
     $stateRoot = if ($env:KUSAKARI_MYSQL_HOME) { $env:KUSAKARI_MYSQL_HOME } else { Join-Path $env:LOCALAPPDATA 'Kusakari\mysql' }
     $stateFile = Join-Path $stateRoot 'instance.json'
     if (-not (Test-Path -LiteralPath $stateFile)) { throw '専用MySQLが未準備です。setup.batを実行してください。' }
     $state = Get-Content -Raw -LiteralPath $stateFile | ConvertFrom-Json
-    if (-not $state.Ready) { throw '専用MySQLの初期化が未完了です。保存先を確認してください。空パスワードでは継続しません。' }
+    if (-not $state.Ready) { return Recover-ManagedMySqlCore $stateRoot $state }
     if (Test-LocalPort $state.Port) {
         $result = Invoke-MySql 'root' (Get-ManagedPassword $stateRoot) $state.Port 'SELECT @@datadir;' -AllowFailure
         $actual = if ($result.Success) { [IO.Path]::GetFullPath($result.Output).TrimEnd('\') } else { '' }
@@ -222,19 +284,33 @@ function Initialize-Database([string]$mode, [switch]$reconfigure) {
                 if ($state.Ready) {
                     $null = Start-ManagedMySql
                 } else {
-                    # A copied or interrupted setup can leave Ready=false. If
-                    # the reset script prepared an existing MySQL on 3306,
-                    # reuse that verified server instead of trusting the stale
-                    # managed state. Never switch without a successful probe.
-                    $existingProbe = $null
-                    if (Test-LocalPort 3306) {
-                        $existingProbe = Invoke-MySql 'root' 'password' 3306 'SELECT VERSION();' -AllowFailure
+                    $recoveryError = $null
+                    try {
+                        $null = Start-ManagedMySql
+                        Write-Host '未完了の専用MySQLを再開し、root/password認証を確認しました。'
+                    } catch {
+                        $recoveryError = $_.Exception.Message
                     }
-                    if ($existingProbe -and $existingProbe.Success) {
-                        Write-Host '未完了の専用MySQLを検出しました。root/passwordで確認できた既存MySQL (3306) を使用します。'
-                        return Initialize-Database 'existing' -reconfigure
+                    if (-not $recoveryError) {
+                        # The managed instance was recovered in place. Continue
+                        # with the saved managed connection settings below.
+                        $state = Get-Content -Raw -LiteralPath $stateFile | ConvertFrom-Json
+                    } else {
+                        # A copied or interrupted setup can leave Ready=false.
+                        # If the reset script prepared an existing MySQL on
+                        # 3306, reuse that verified server instead of trusting
+                        # the stale managed state. Never switch without a
+                        # successful probe.
+                        $existingProbe = $null
+                        if (Test-LocalPort 3306) {
+                            $existingProbe = Invoke-MySql 'root' 'password' 3306 'SELECT VERSION();' -AllowFailure
+                        }
+                        if ($existingProbe -and $existingProbe.Success) {
+                            Write-Host '未完了の専用MySQLを検出しました。root/passwordで確認できた既存MySQL (3306) を使用します。'
+                            return Initialize-Database 'existing' -reconfigure
+                        }
+                        throw "専用MySQLの初期化が未完了です。$recoveryError 3306の既存MySQLもroot/passwordで確認できませんでした。"
                     }
-                    throw '専用MySQLの初期化が未完了です。保存先を確認してください。空パスワードでは継続しません。'
                 }
             } else {
                 # An older or copied .env may point to the managed mode before
