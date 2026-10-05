@@ -339,9 +339,13 @@ function Initialize-Database([string]$mode, [switch]$reconfigure) {
             $adminUser = 'root'
             # The local convention is password. Ask only when an existing
             # server has a different root credential.
-            $adminPassword = 'password'
+            $fixedAdminPassword = if ($env:KUSAKARI_EXISTING_MYSQL_PASSWORD) { $env:KUSAKARI_EXISTING_MYSQL_PASSWORD } else { $null }
+            $adminPassword = if ($fixedAdminPassword) { $fixedAdminPassword } else { 'password' }
             $probe = Invoke-MySql $adminUser $adminPassword $port 'SELECT VERSION();' -AllowFailure
             if (-not $probe.Success) {
+                if ($fixedAdminPassword) {
+                    throw '既存MySQLへroot/passwordで接続できません。MySQLのrootパスワードをpasswordに変更してから再実行してください。'
+                }
                 $adminPassword = Read-Password 'MySQL rootパスワード（非表示）'
                 $null = Invoke-MySql $adminUser $adminPassword $port 'SELECT VERSION();'
             }

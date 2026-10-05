@@ -73,6 +73,41 @@ Windows 10/11 x64のWindows PowerShell 5.1で `setup.bat` を実行します。`
 別PCへ `.env`、`.runtime`、DBデータをコピーせず、そのPCでセットアップしてください。
 手順と制約は [docs/windows-setup.md](docs/windows-setup.md) を参照してください。
 
+### 既存MySQLを使う別PC向け
+
+MySQL ServerをそのPCへインストール済みで、rootパスワードを `password` に設定している場合は、`setup-existing-mysql.bat` を実行します。MySQLサービスが停止していれば自動起動し、TCP 3306の `kusakari` / `kusakari_e2e` DB、アプリユーザー、Flywayスキーマを準備します。rootパスワードは保存しません。
+
+## Dockerで起動する場合
+
+Docker Desktopを起動した状態で、プロジェクトのルートから次を実行します。ホスト側のMySQLやGreenlyのDBは使用しません。
+
+```powershell
+docker compose up --build
+```
+
+ブラウザーで http://localhost:5186 を開きます。APIは http://localhost:8086/api/health、Docker内MySQLのホスト公開ポートは 13306 です。MySQLのデータは `kusakari-mysql` ボリュームに保存されます。
+
+停止する場合は次を実行します。
+
+```powershell
+docker compose down
+```
+
+データを削除して初期化し直す場合だけ、次を実行します。既存の注文・カート・DBデータも削除されます。
+
+```powershell
+docker compose down -v
+```
+
+ホスト側ポートを変更する場合は、例えば次のように指定します。
+
+```powershell
+$env:KUSAKARI_WEB_HOST_PORT = '15186'
+$env:KUSAKARI_API_HOST_PORT = '18086'
+$env:MYSQL_HOST_PORT = '13306'
+docker compose up --build
+```
+
 ## 開発と検証
 
 ```powershell

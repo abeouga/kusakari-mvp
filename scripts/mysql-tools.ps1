@@ -3,6 +3,7 @@
 function Get-KusakariMySqlBin {
   param([switch]$Portable)
   $candidates = @()
+  if ($env:KUSAKARI_EXISTING_MYSQL_BIN) { $candidates += $env:KUSAKARI_EXISTING_MYSQL_BIN }
   $stateRoot = if ($env:KUSAKARI_MYSQL_HOME) { $env:KUSAKARI_MYSQL_HOME } else { Join-Path $env:LOCALAPPDATA 'Kusakari\mysql' }
   $stateFile = Join-Path $stateRoot 'instance.json'
   if (Test-Path -LiteralPath $stateFile) {
@@ -18,6 +19,20 @@ function Get-KusakariMySqlBin {
   # MySQL installations, so the two projects do not download the same ZIP.
   $installed = Get-Command mysqld.exe -ErrorAction SilentlyContinue | Select-Object -First 1
   if ($null -ne $installed) { $candidates += Split-Path -Parent $installed.Source }
+  $services = @(Get-CimInstance Win32_Service -ErrorAction SilentlyContinue | Where-Object {
+    $path = [string]$_.PathName
+    $_.Name -match '(?i)mysql|maria' -or
+      $_.DisplayName -match '(?i)mysql|maria' -or
+      $path -match '(?i)\\mysqld(?:\.exe)?(?:[" ]|$)'
+  })
+  foreach ($service in $services) {
+    $path = [string]$service.PathName
+    $match = [regex]::Match($path, '^\s*"([^"]*mysqld\.exe)"', [Text.RegularExpressions.RegexOptions]::IgnoreCase)
+    if (-not $match.Success) {
+      $match = [regex]::Match($path, '^\s*([^ ]*mysqld\.exe)', [Text.RegularExpressions.RegexOptions]::IgnoreCase)
+    }
+    if ($match.Success) { $candidates += Split-Path -Parent $match.Groups[1].Value }
+  }
   $programFilesX86 = [Environment]::GetEnvironmentVariable('ProgramFiles(x86)')
   $searchRoots = @(
     (Join-Path $env:ProgramFiles 'MySQL'),
@@ -45,6 +60,10 @@ function Get-KusakariMySqlBin {
       Write-Host "既存のMySQL実行ファイルを再利用します: $resolvedCandidate"
       return $resolvedCandidate
     }
+  }
+
+  if ($env:KUSAKARI_EXISTING_MYSQL_ONLY -eq '1') {
+    throw '既存MySQLの実行ファイルを特定できません。MySQL Serverのインストール先とサービス設定を確認してください。'
   }
 
   $architecture = $env:PROCESSOR_ARCHITEW6432
