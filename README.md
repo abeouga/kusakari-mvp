@@ -79,6 +79,8 @@ MySQL ServerをそのPCへインストール済みで、rootパスワードを `
 
 セットアップ後の起動は `start-existing-mysql.bat` を実行します。この起動スクリプトは設定とMySQLの稼働を確認し、必要な場合だけ既存MySQL向けセットアップを再実行してからAPIとWebを起動します。ブラウザーとSysOverRayを開かない場合は `start-existing-mysql.bat -NoBrowser -NoOverlay` を使います。
 
+通常の`setup.bat` / `start.bat`と混同しないようにまとめて実行する場合は、`script-for-mysql\setup.bat`、続いて`script-for-mysql\start.bat`を使用します。このフォルダーはプロジェクト内であれば移動できます。
+
 ## Dockerで起動する場合
 
 Docker Desktopを起動した状態で、プロジェクトのルートから次を実行します。ホスト側のMySQLやGreenlyのDBは使用しません。
