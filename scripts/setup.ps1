@@ -58,7 +58,7 @@ try {
         }
     } finally { $env:KUSAKARI_DB_URL = $previousUrl; Remove-Item Env:KUSAKARI_API_PORT -ErrorAction SilentlyContinue }
     if ($ExistingMySql) {
-        Write-Host '既存MySQL向けセットアップが完了しました。start-existing-mysql.batで起動してください。'
+        Write-Host '既存MySQL向けセットアップが完了しました。script-for-mysql\start.batで起動してください。'
     } else {
         Write-Host 'セットアップが完了しました。start.batで起動してください。'
     }

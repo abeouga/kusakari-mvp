@@ -2,8 +2,8 @@
 
 MySQL ServerをPCへインストール済みで、rootパスワードを`password`、ポートを3306にしている場合に使用します。
 
-1. `setup.bat`または`setup-existing-mysql.bat`を実行します。
-2. セットアップ完了後、`start.bat`または`start-existing-mysql.bat`を実行します。
+1. `setup.bat`を実行します。
+2. セットアップ完了後、`start.bat`を実行します。
 3. 停止するときはプロジェクト直下の`stop.bat`を実行します。KusakariのAPI/Webだけを停止し、既存MySQLは停止しません。
 
 ブラウザーとSysOverRayを開かずに起動する場合は、次を実行します。

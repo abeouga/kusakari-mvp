@@ -27,7 +27,7 @@ DB名は `kusakari` / `kusakari_e2e` に固定し、接続先は `127.0.0.1` に
 アプリでrootアカウントを使用しません。アプリユーザーにはこの2つのDBだけに権限を付与します。
 接続・Flyway・カタログを検証できなければセットアップ成功と表示しません。
 
-MySQL Serverを事前にインストール済みで、rootパスワードを`password`に固定したPCでは、`script-for-mysql\setup-existing-mysql.bat`を実行してから`script-for-mysql\start-existing-mysql.bat`を実行します。この経路はTCP 3306の既存MySQLを使用し、rootパスワードの入力を求めません。`.env`が既存MySQL設定になっている場合は、通常の`start.bat`もこの経路へ自動的に切り替わります。
+MySQL Serverを事前にインストール済みで、rootパスワードを`password`に固定したPCでは、`script-for-mysql\setup.bat`を実行してから`script-for-mysql\start.bat`を実行します。この経路はTCP 3306の既存MySQLを使用し、rootパスワードの入力を求めません。`.env`が既存MySQL設定になっている場合は、通常の`start.bat`もこの経路へ自動的に切り替わります。
 
 ### 再実行・設定変更
 

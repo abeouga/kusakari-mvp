@@ -75,9 +75,9 @@ Windows 10/11 x64のWindows PowerShell 5.1で `setup.bat` を実行します。`
 
 ### 既存MySQLを使う別PC向け
 
-MySQL ServerをそのPCへインストール済みで、rootパスワードを `password` に設定している場合は、`script-for-mysql\setup-existing-mysql.bat` を実行します。MySQLサービスが停止していれば自動起動し、TCP 3306の `kusakari` / `kusakari_e2e` DB、アプリユーザー、Flywayスキーマを準備します。rootパスワードは保存しません。
+MySQL ServerをそのPCへインストール済みで、rootパスワードを `password` に設定している場合は、`script-for-mysql\setup.bat` を実行します。MySQLサービスが停止していれば自動起動し、TCP 3306の `kusakari` / `kusakari_e2e` DB、アプリユーザー、Flywayスキーマを準備します。rootパスワードは保存しません。
 
-セットアップ後の起動は `script-for-mysql\start-existing-mysql.bat` を実行します。この起動スクリプトは設定とMySQLの稼働を確認し、必要な場合だけ既存MySQL向けセットアップを再実行してからAPIとWebを起動します。ブラウザーとSysOverRayを開かない場合は `script-for-mysql\start-existing-mysql.bat -NoBrowser -NoOverlay` を使います。
+セットアップ後の起動は `script-for-mysql\start.bat` を実行します。この起動スクリプトは設定とMySQLの稼働を確認し、必要な場合だけ既存MySQL向けセットアップを再実行してからAPIとWebを起動します。ブラウザーとSysOverRayを開かない場合は `script-for-mysql\start.bat -NoBrowser -NoOverlay` を使います。
 
 通常の`setup.bat` / `start.bat`と混同しないようにまとめて実行する場合は、`script-for-mysql\setup.bat`、続いて`script-for-mysql\start.bat`を使用します。このフォルダーはプロジェクト内であれば移動できます。
 
