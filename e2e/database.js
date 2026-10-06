@@ -66,7 +66,7 @@ export function removeScarceProduct(id) {
     .split(/\r?\n/)
     .filter(Boolean);
   sql(`DELETE FROM order_items WHERE product_id=${literal(id)};
-    ${orders.map((order) => `DELETE FROM orders WHERE id=${literal(order)};`).join('\n')}
+    ${orders.map((order) => `DELETE FROM order_details WHERE order_id=${literal(order)}; DELETE FROM orders WHERE id=${literal(order)};`).join('\n')}
     DELETE FROM cart_items WHERE product_id=${literal(id)};
     DELETE FROM inventory WHERE product_id=${literal(id)};
     DELETE FROM products WHERE id=${literal(id)};`);

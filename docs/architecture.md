@@ -9,8 +9,11 @@ Greenlyから独立した植物ECを作成します。Java / Spring Boot、JavaS
 ### データの正本と責務
 
 - 商品、店舗別在庫、カート、注文はMySQLを正本とします。
-- ControllerはHTTP入力と応答のみを担当し、Serviceが業務処理、RepositoryがSQLを担当します。
-- HTTPのDTOとDB内部のrecordを分離します。SQLはプレースホルダーで実行します。
+- Javaは機能単位の `catalog` / `commerce` と横断的な `common` に分け、その中で `controller` / `service` / `persistence` / `dto` / `mapper` を分離します。
+- ControllerはHTTP入力と応答のみを担当し、Serviceが業務処理、Spring Data JPA Repositoryが永続化を担当します。
+- HTTP DTO、JPA Entity、API応答を分離します。MapStructは単純なDTO変換に使い、注文確定などの業務判断はServiceに残します。
+- LombokはEntityの定型アクセサとJPA用コンストラクターに限定して使います。可変Entityに `@Data` を付けず、意図しないequals/hashCode/toStringを生成しません。
+- Flywayをスキーマ変更の正本として維持し、Hibernateは `ddl-auto=validate` でEntityとDBの不一致を起動時に検出します。既存テーブル構造とデータをJPA導入のために作り直しません。
 - Reactのコンポーネントは画面、`useShop.js` は処理の順序、`api.js` はHTTP、`types.js` は契約の説明を担当します。
 - スタイルはページ部位とレスポンシブ規則で分割し、Javaを含めたPrettier設定を共有します。
 
@@ -43,9 +46,16 @@ Greenlyから独立した植物ECを作成します。Java / Spring Boot、JavaS
 - `start.bat`は既存の自プロセスを停止して固定ポートで再作成します。他プロセスとの競合はエラーとし、ポートを増やしません。
 - SysOverRayはKusakari専用のWPFプロセスです。API/Webの応答と、実際に見える操作画面を別々に確認します。起動スクリプトは可視・非最小化・最前面属性・UI Automationの操作ボタンを照合します。
 
+### 永続化
+
+- Spring Data JPAを採用し、各機能の `persistence/entity` と `persistence/repository` にEntityとRepositoryを置きます。
+- 注文確定時のロック順、在庫の悲観ロック、冪等性確認、READ COMMITTED、更新範囲はServiceのトランザクション内で明示します。Repositoryのメソッド名だけでは表現できないロック条件は `@Query` と `@Lock` に残します。
+- Lombokは短縮効果が高いボイラープレートに限定し、注文・在庫処理などの状態遷移は明示的なメソッドで表します。
+
 ## Alternatives
 
-- JPA: 採用可能ですが、この規模では少数の明示SQLとrecordの方が在庫ロックの範囲を確認しやすいためSpring JDBCを採用しました。
+- Spring JDBC: SQLとロック範囲を直接追いやすい一方、行マッピングやCRUDの定型処理が重複するため今回は採用しません。必要なロック条件はJPA Repositoryのクエリとして明示します。
+- Spring Security: 現状は会員認証を提供せず、ローカルデモ用のセッションCookieだけを扱います。認証・認可フローがない段階で導入すると設定と責務が増えるため追加しません。
 - localStorageカート: サーバー側の整合性と再起動後の注文確認を優先し、MySQLへ保存します。
 - 実決済の導入: 決済提供元・店舗契約が指定されていないため、デモ注文に限定します。
 - Greenlyから直接注文: 設計データと購入同意を分けるため、候補提示→人による選択→ECの確認画面の順にします。
@@ -54,8 +64,10 @@ Greenlyから独立した植物ECを作成します。Java / Spring Boot、JavaS
 ## Consequences
 
 - ローカルECの購入フローと将来の材料対応付けを独立して検証できます。
+- Javaの配置は機能と層で追えます。JPAが定型的な行マッピングを担い、EntityとDBのずれはHibernateの起動時検証で検出します。
+- JPA導入時点ではFlywayスキーマや既存データの移行は行いません。起動時の `validate` が通ることを移行完了条件とします。
 - 在庫予約は注文時だけです。カートに入れた時点では在庫確保されません。
-- 認証、決済、キャンセル・返金、配送、税・送料の地域差、管理画面、本番バックアップは実装範囲外です。
+- 認証、実決済、キャンセル・返金、実配送、税・送料の地域差、運用向け管理画面、本番バックアップは実装範囲外です。ローカルデモの商品管理・受取情報・送料は [画面案のCRUD実装](mockup-crud.md) を参照してください。
 - Cookieを失うと同じカートへ戻れません。公開環境では会員や安全なゲスト注文参照への移行が必要です。
 - 起動済みのKusakariを再実行すると一時的に接続が切れます。注文データはMySQLに残ります。
 

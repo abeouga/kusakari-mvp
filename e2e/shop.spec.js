@@ -164,7 +164,7 @@ test('checkout retry after an explicitly lost response keeps the same order', as
       await route.continue();
     });
     await page.getByRole('button', { name: 'デモ注文を確定する' }).click();
-    await expect(page.getByRole('alert')).toContainText('サーバーに接続できません');
+    await expect(page.getByRole('dialog').getByRole('alert')).toContainText('サーバーに接続できません');
     await page.getByRole('button', { name: 'デモ注文を確定する' }).click();
     await expect(page.getByRole('dialog')).toContainText('注文を保存しました');
     expect(payloads).toHaveLength(2);

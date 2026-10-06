@@ -44,6 +44,20 @@ export const api = {
   checkout: (payload) => request('/orders', 'POST', JSON.stringify(payload)),
   /** @returns {Promise<import('./types').Order[]>} */
   orders: () => request('/orders'),
+  /** @param {import('./types').ProductInput} input @returns {Promise<import('./types').Product>} */
+  createProduct: (input) => request('/products', 'POST', JSON.stringify(input)),
+  /** @param {string} id @param {import('./types').ProductInput} input @returns {Promise<import('./types').Product>} */
+  updateProduct: (id, input) => request(`/products/${encodeURIComponent(id)}`, 'PUT', JSON.stringify(input)),
+  /** @param {string} id */
+  deleteProduct: (id) => request(`/products/${encodeURIComponent(id)}`, 'DELETE'),
+  /** @param {import('./types').DeliveryDetails} details @param {number} revision @returns {Promise<import('./types').Cart>} */
+  saveDetails: (details, revision) => request('/cart/details', 'PUT', JSON.stringify({ details, revision })),
+  /** @param {number} revision @returns {Promise<import('./types').Cart>} */
+  clearDetails: (revision) => request(`/cart/details?revision=${revision}`, 'DELETE'),
+  /** @param {string} id @param {import('./types').DeliveryDetails} details @returns {Promise<import('./types').Order>} */
+  updateOrder: (id, details) => request(`/orders/${encodeURIComponent(id)}`, 'PUT', JSON.stringify(details)),
+  /** @param {string} id */
+  deleteOrder: (id) => request(`/orders/${encodeURIComponent(id)}`, 'DELETE'),
   /** @param {number} storeId @param {import('./types').MaterialItem[]} items @returns {Promise<import('./types').MaterialMatch[]>} */
   materials: (storeId, items) => request('/materials/quote', 'POST', JSON.stringify({ storeId, items })),
 };

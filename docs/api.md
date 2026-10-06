@@ -1,4 +1,4 @@
-# API契約（v1の実装）
+# API契約
 
 開発URL: `http://127.0.0.1:8086/api`。ブラウザーはViteの `/api` プロキシを使用します。
 リクエストと応答はJSON、金額は税込JPYの整数、数量は1〜99の整数です。
@@ -28,7 +28,32 @@
 
 `requestId` は操作ごとにUUIDを生成し、通信失敗後の再試行では同じ値を使います。
 レスポンスは注文ID、`DEMO_CONFIRMED`、保存日時、店舗名、合計金額、商品ID/SKU/商品名/数量/単価/小計の明細です。
-住所、氏名、カード情報は受け取りません。
+住所・氏名は受取情報APIで保存し、注文時に複製します。カード番号は受け取りません。
+
+## 画面案に対応したCRUD
+
+| メソッド | パス | 内容 |
+|---|---|---|
+| POST | `/products` | 商品を登録。選択店舗に指定在庫、他店舗に在庫0を設定 |
+| PUT | `/products/{id}` | 商品属性・画像と選択店舗の在庫を更新 |
+| DELETE | `/products/{id}` | 販売終了。カート・注文記録は保持 |
+| PUT | `/cart/details` | `{revision, details}` で受取情報を保存しrevisionを更新 |
+| DELETE | `/cart/details?revision=...` | 入力情報を削除し店舗受取の初期値に戻す |
+| PUT | `/orders/{id}` | 同じCookieの注文の受取者・連絡先・住所・希望日時・デモ支払方法を更新 |
+| DELETE | `/orders/{id}` | 同じCookieの注文を履歴から非表示。注文取消・在庫復元は行わない |
+
+商品入力は `ProductRequest.java`、受取情報は `DeliveryDtos.java` を正本とします。
+商品には生産者、日照、手入れレベル、用途、温度、耐暑性・耐乾性、樹齢、高さ、鉢径、科名、開花、季節管理、空間との相性、追加画像を含みます。
+価格は1〜100,000円、店舗在庫は0〜10,000点、追加画像は4枚までです。
+登録・更新で商品番号が重複した場合は409、入力不正・未知フィールドは400です。
+
+`details` は `fulfillmentMethod`, `paymentMethod`, `recipientName`, `recipientPhone`, `contactEmail`, `postalCode`, `addressLine1`, `addressLine2`, `requestedDate`, `timeSlot` を持ちます。
+受取は `PICKUP` または `DELIVERY`、支払は `DEMO_CARD`, `DEMO_WALLET`, `STORE` です。
+配送では受取者名・電話・郵便番号・住所を必須とし、`STORE` は使えません。
+希望日は空または実在する `yyyy-MM-dd`、時間帯は `ANY`, `10-12`, `14-16`, `16-18` です。
+店舗受取の送料は0円、配送は注文ごとに800円です。空カートの送料は0円です。
+カート・注文の応答は `subtotalYen`, `shippingFeeYen`, `details` を含みます。
+注文後の受取区分・金額は固定です。他Cookieの注文への編集・削除は404です。
 
 ## 材料から商品への対応付け
 

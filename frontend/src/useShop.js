@@ -32,6 +32,7 @@ export function useShop() {
       setNotice('');
       try {
         await action();
+        return true;
       } catch (reason) {
         let message = '処理に失敗しました。';
         if (reason instanceof Error) message = reason.message;
@@ -44,6 +45,7 @@ export function useShop() {
             /* Keep the original conflict visible. */
           }
         }
+        return false;
       } finally {
         operation.current = false;
         setBusy(false);
@@ -140,7 +142,64 @@ export function useShop() {
     );
   }
 
+  /** @param {string} id @param {import('./types').ProductInput} input */
+  function saveProduct(id, input) {
+    return run(async () => {
+      if (id) await api.updateProduct(id, input);
+      else await api.createProduct(input);
+      await refresh();
+      setNotice('商品を保存しました。');
+    });
+  }
+  /** @param {string} id */
+  function deleteProduct(id) {
+    return run(async () => {
+      await api.deleteProduct(id);
+      await refresh();
+      setNotice('商品を一覧から削除しました。');
+    });
+  }
+  /** @param {import('./types').DeliveryDetails} details */
+  function saveDetails(details) {
+    return run(async () => {
+      if (!cart) return;
+      setCart(await api.saveDetails(details, cart.revision));
+      checkoutRequest.current = null;
+      setNotice('受取・配送情報を保存しました。');
+    });
+  }
+  function clearDetails() {
+    return run(async () => {
+      if (!cart) return;
+      setCart(await api.clearDetails(cart.revision));
+      checkoutRequest.current = null;
+      setNotice('入力情報を削除しました。');
+    });
+  }
+  /** @param {string} id @param {import('./types').DeliveryDetails} details */
+  function updateOrder(id, details) {
+    return run(async () => {
+      await api.updateOrder(id, details);
+      await refresh();
+      setNotice('注文情報を更新しました。');
+    });
+  }
+  /** @param {string} id */
+  function deleteOrder(id) {
+    return run(async () => {
+      await api.deleteOrder(id);
+      await refresh();
+      setNotice('注文を履歴から削除しました。');
+    });
+  }
+
   return {
+    saveProduct,
+    deleteProduct,
+    saveDetails,
+    clearDetails,
+    updateOrder,
+    deleteOrder,
     cart,
     products,
     stores,

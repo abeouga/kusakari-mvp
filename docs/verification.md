@@ -1,5 +1,22 @@
 # 検証記録
 
+## 2026-10-06: Stitch画面案のCRUD拡張（検証中）
+
+実行先: `C:\Users\t_abe\Desktop\kusakari-mvp`。
+
+`npm run check` のcheckJs、ESLint、Viteビルド、Java 21向けMaven packageは成功しました。
+Javaユニットテストは既存構成どおり追加せず、実API・MySQLでのCRUDと既存購入フローを検証します。
+
+追加シナリオは `e2e/crud.spec.js` です。商品CRUDと画像・絞り込み、価格更新後の合計、販売終了商品の購入拒否、受取情報CRUD、注文情報の独立保存、他セッションの操作拒否、履歴削除後の注文再送、390px画面の保存・再読み込みを確認します。
+保存した画像とAPI JSONは `artifacts/e2e/crud-*` に出力します。
+
+現時点でE2Eは未完了です。MySQL80サービスが停止しており、APIはFlywayのDB接続段階で失敗しています。
+`Start-Service MySQL80` は実行環境のサービス起動権限不足で失敗しました。
+ログ: `.runtime/crud-e2e-api-diagnostic.log`。以下の過去の成功記録は今回のCRUD変更の検証結果ではありません。
+
+開発DBの変更前バックアップはgitignore対象の `.runtime/backups/kusakari-before-crud-20261006.sql` に保存済みです。
+V2マイグレーションは新API起動時に適用されます。現時点ではDBに未適用です。
+
 ## 2026-10-06: JavaScriptの簡素化
 
 実行先: `C:\Users\t_abe\Desktop\kusakari-mvp`。

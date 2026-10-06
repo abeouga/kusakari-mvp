@@ -4,59 +4,41 @@ import {
   ArrowRight,
   ArrowUpRight,
   Check,
-  ChevronDown,
   Leaf,
   MapPin,
-  Search,
   ShoppingBag,
+  PackageCheck,
   Sprout,
   X,
-  PackageCheck,
   ListTree,
 } from 'lucide-react';
 import { useShop } from './useShop';
-import { ProductCard } from './components/ProductCard';
+import { Catalog } from './components/Catalog';
+import { ProductManager } from './components/ProductManager';
+import { Orders } from './components/Orders';
 import { ProductDetail } from './components/ProductDetail';
 import { Dialog } from './components/Dialog';
-import { Cart, OrderSummary } from './components/Cart';
+import { Cart } from './components/Cart';
 import { Stores } from './components/Stores';
 import { Materials } from './components/Materials';
-
-const categories = ['すべて', '庭木', '草花', 'ハーブ', '観葉植物'];
 
 export default function App() {
   const shop = useShop();
   const [panel, setPanel] = useState('');
   const [detailId, setDetailId] = useState('');
-  const [category, setCategory] = useState('すべて');
-  const [search, setSearch] = useState('');
-  const [sort, setSort] = useState('recommended');
-  const [inStockOnly, setInStockOnly] = useState(false);
   const detail = shop.products.find((product) => product.id === detailId);
-  const keyword = search.trim().toLowerCase();
-  const products = [];
-  for (const product of shop.products) {
-    if (category !== 'すべて' && product.category !== category) continue;
-    if (inStockOnly && product.stock === 0) continue;
-    const text = `${product.name} ${product.latinName} ${product.sku}`.toLowerCase();
-    if (!text.includes(keyword)) continue;
-    products.push(product);
-  }
-  if (sort === 'price-asc') {
-    products.sort((a, b) => a.priceYen - b.priceYen);
-  }
-  if (sort === 'price-desc') {
-    products.sort((a, b) => b.priceYen - a.priceYen);
-  }
   let itemCount = 0;
   let storeName = '';
-  let storeLabel = '読み込み中…';
   if (shop.cart) {
     itemCount = shop.cart.itemCount;
     storeName = shop.cart.storeName;
-    storeLabel = storeName;
   }
-  const loading = !shop.cart && shop.busy;
+  /** @param {string} id */
+  function openDetail(id) {
+    shop.setError('');
+    shop.setNotice('');
+    setDetailId(id);
+  }
 
   function close() {
     setPanel('');
@@ -142,11 +124,7 @@ export default function App() {
               height="1536"
             />
             <span className="vertical-caption">A LITTLE GREEN, A LITTLE BETTER.</span>
-            <button
-              className="hero-product-label"
-              onClick={() => setDetailId('olive')}
-              disabled={!shop.products.length}
-            >
+            <button className="hero-product-label" onClick={() => openDetail('olive')} disabled={!shop.products.length}>
               <span>
                 <small>MEET YOUR FIRST GREEN</small>
                 <strong>オリーブ</strong>
@@ -180,120 +158,7 @@ export default function App() {
           </span>
         </div>
 
-        <section className="catalog section-container" id="plants">
-          <div className="section-heading">
-            <div>
-              <p className="eyebrow">FIND YOUR GREEN</p>
-              <h2>わたしに合う、ひと鉢。</h2>
-            </div>
-            <p>
-              庭にも、ベランダにも、お部屋にも。
-              <br />
-              植物との暮らしを、ここから。
-            </p>
-          </div>
-          <div className="store-strip">
-            <span>
-              <MapPin size={17} />
-              <small>受取店舗</small>
-              <strong>{storeLabel}</strong>
-            </span>
-            <button onClick={() => open('stores')} disabled={!shop.cart}>
-              店舗を変更
-              <ChevronDown size={15} />
-            </button>
-          </div>
-          <div className="catalog-controls">
-            <div className="categories" aria-label="商品カテゴリー">
-              {categories.map((item) => (
-                <button key={item} aria-pressed={category === item} onClick={() => setCategory(item)}>
-                  {item}
-                </button>
-              ))}
-            </div>
-            <label className="search-input">
-              <Search size={17} />
-              <input
-                aria-label="植物を検索"
-                placeholder="名前・品番で検索"
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-              />
-              {search && (
-                <button aria-label="検索をクリア" onClick={() => setSearch('')}>
-                  <X size={14} />
-                </button>
-              )}
-            </label>
-          </div>
-          <div className="catalog-meta">
-            <span>
-              {products.length} ITEMS <small>/ すべて税込価格</small>
-            </span>
-            <div>
-              <label className="stock-filter">
-                <input
-                  type="checkbox"
-                  checked={inStockOnly}
-                  onChange={(event) => setInStockOnly(event.target.checked)}
-                />
-                在庫ありのみ
-              </label>
-              <select aria-label="商品の並び順" value={sort} onChange={(event) => setSort(event.target.value)}>
-                <option value="recommended">おすすめ順</option>
-                <option value="price-asc">価格が安い順</option>
-                <option value="price-desc">価格が高い順</option>
-              </select>
-            </div>
-          </div>
-          {shop.error && !panel && !detail && (
-            <div className="error" role="alert">
-              {shop.error}
-              <button className="text-button" onClick={shop.initialize} disabled={shop.busy}>
-                再読み込み
-              </button>
-            </div>
-          )}
-          {loading && (
-            <div className="loading" role="status">
-              植物を読み込んでいます…
-            </div>
-          )}
-          {!loading && (
-            <div className="product-grid">
-              {products.map((product) => (
-                <ProductCard
-                  key={product.id}
-                  product={product}
-                  onOpen={() => {
-                    shop.setError('');
-                    shop.setNotice('');
-                    setDetailId(product.id);
-                  }}
-                  onAdd={() => shop.add(product.id)}
-                  disabled={shop.busy || !shop.cart}
-                />
-              ))}
-            </div>
-          )}
-          {shop.cart && !products.length && (
-            <div className="empty">
-              <Leaf size={30} />
-              <h3>条件に合う植物が見つかりません。</h3>
-              <button
-                className="secondary-button"
-                onClick={() => {
-                  setCategory('すべて');
-                  setSearch('');
-                  setInStockOnly(false);
-                }}
-              >
-                条件をリセット
-              </button>
-            </div>
-          )}
-          <p className="catalog-note">画像はAI生成です。掲載商品・価格・在庫・店舗は、このサイトのデモ用データです。</p>
-        </section>
+        <Catalog shop={shop} onStores={() => open('stores')} onDetail={openDetail} />
 
         <section className="material-banner section-container">
           <div className="material-illustration">
@@ -347,6 +212,7 @@ export default function App() {
           <p>植物と、暮らす。</p>
         </div>
         <div className="footer-links">
+          <button onClick={() => open('manage')}>商品管理</button>
           <button onClick={() => open('guide')}>ご利用ガイド</button>
           <button onClick={() => open('stores')}>店舗一覧</button>
           <button onClick={() => open('orders')}>注文履歴</button>
@@ -362,7 +228,7 @@ export default function App() {
           <Check size={17} />
           {shop.notice}
           <button onClick={() => open('cart')}>
-            バッグを見る
+            カートを見る
             <ArrowRight size={15} />
           </button>
           <button aria-label="通知を閉じる" onClick={() => shop.setNotice('')}>
@@ -372,10 +238,11 @@ export default function App() {
       )}
       {detail && (
         <ProductDetail
+          key={detail.id}
           product={detail}
           storeName={storeName}
           onClose={close}
-          onAdd={() => shop.add(detail.id)}
+          onAdd={(quantity) => shop.add(detail.id, quantity)}
           busy={shop.busy}
           notice={shop.notice}
           error={shop.error}
@@ -384,20 +251,8 @@ export default function App() {
       {panel === 'cart' && <Cart shop={shop} onClose={close} onStores={() => open('stores')} />}
       {panel === 'stores' && <Stores shop={shop} onClose={close} />}
       {panel === 'materials' && <Materials shop={shop} onClose={close} />}
-      {panel === 'orders' && (
-        <Dialog title="注文履歴" onClose={close}>
-          {shop.orders.map((order) => (
-            <OrderSummary order={order} key={order.id} />
-          ))}
-          {shop.orders.length === 0 && (
-            <div className="empty">
-              <PackageCheck size={36} />
-              <h3>注文履歴はまだありません。</h3>
-              <p>このブラウザーで確定したデモ注文が表示されます。</p>
-            </div>
-          )}
-        </Dialog>
-      )}
+      {panel === 'orders' && <Orders shop={shop} onClose={close} />}
+      {panel === 'manage' && <ProductManager shop={shop} onClose={close} />}
       {panel === 'guide' && (
         <Dialog title="Kusakariについて" onClose={close}>
           <div className="guide">
@@ -415,7 +270,7 @@ export default function App() {
               すべて税込価格、店舗受け取りは無料です。実決済・配送・実店舗への予約は発生しません。商品画像はAI生成、店舗は架空です。
             </p>
             <p>
-              カートと注文履歴はブラウザーのCookieに紐づいて保存されます。Cookieを削除すると、同じ履歴を開けなくなります。個人情報やカード情報は入力しません。
+              カートと注文履歴はブラウザーのCookieに紐づいて保存されます。Cookieを削除すると、同じ履歴を開けなくなります。連絡先にはデモ情報を入力してください。カード情報は入力しません。
             </p>
             <h4>材料リストについて</h4>
             <p>材料コードから商品候補を検索できます。現在はGreenlyとの自動接続はありません。</p>
