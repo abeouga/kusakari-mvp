@@ -89,9 +89,9 @@ try {
     $env:KUSAKARI_EXISTING_MYSQL_PASSWORD = 'password'
     $setupScript = Join-Path $PSScriptRoot 'setup.ps1'
     if ($SkipInstall) {
-        & $setupScript -DatabaseMode existing -Reconfigure -SkipInstall
+        & $setupScript -DatabaseMode existing -Reconfigure -SkipInstall -ExistingMySql
     } else {
-        & $setupScript -DatabaseMode existing -Reconfigure
+        & $setupScript -DatabaseMode existing -Reconfigure -ExistingMySql
     }
     if ($LASTEXITCODE -and $LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 } catch {

@@ -1,6 +1,7 @@
 ﻿param(
     [switch]$SkipInstall,
     [switch]$Reconfigure,
+    [switch]$ExistingMySql,
     [ValidateSet('auto','existing','managed')][string]$DatabaseMode = 'auto'
 )
 . "$PSScriptRoot\common.ps1"
@@ -56,5 +57,9 @@ try {
             }
         }
     } finally { $env:KUSAKARI_DB_URL = $previousUrl; Remove-Item Env:KUSAKARI_API_PORT -ErrorAction SilentlyContinue }
-    Write-Host 'セットアップが完了しました。start.batで起動してください。'
+    if ($ExistingMySql) {
+        Write-Host '既存MySQL向けセットアップが完了しました。start-existing-mysql.batで起動してください。'
+    } else {
+        Write-Host 'セットアップが完了しました。start.batで起動してください。'
+    }
 } finally { if ($lock) { $lock.Dispose() } }
