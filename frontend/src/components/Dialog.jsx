@@ -4,13 +4,16 @@ import { X } from 'lucide-react';
 /** @param {{title:string, onClose:()=>void, children:import('react').ReactNode, wide?:boolean}} props */
 export function Dialog({ title, onClose, children, wide = false }) {
   const ref = useRef(/** @type {HTMLDialogElement|null} */ (null));
+  let className = 'dialog';
+  if (wide) className = 'dialog dialog-wide';
   useEffect(() => {
     const element = ref.current;
     const previous = document.activeElement;
-    element?.showModal();
+    if (!element) return;
+    element.showModal();
     document.body.style.overflow = 'hidden';
     return () => {
-      element?.close();
+      element.close();
       document.body.style.overflow = '';
       if (previous instanceof HTMLElement) previous.focus();
     };
@@ -18,7 +21,7 @@ export function Dialog({ title, onClose, children, wide = false }) {
   return (
     <dialog
       ref={ref}
-      className={`dialog ${wide ? 'dialog-wide' : ''}`}
+      className={className}
       aria-label={title}
       onCancel={(event) => {
         event.preventDefault();

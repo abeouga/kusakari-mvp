@@ -3,6 +3,12 @@ import { yen } from '../api';
 
 /** @param {{product:import('../types').Product, onOpen:()=>void, onAdd:()=>void, disabled:boolean}} props */
 export function ProductCard({ product, onOpen, onAdd, disabled }) {
+  let stockClass = 'sold-out';
+  let stockLabel = 'この店舗では在庫なし';
+  if (product.stock > 0) {
+    stockClass = 'stock';
+    stockLabel = `在庫 ${product.stock} 点`;
+  }
   return (
     <article className="product-card" data-testid={`product-${product.id}`}>
       <button className="product-photo" onClick={onOpen} aria-label={`${product.name}の詳細`}>
@@ -14,9 +20,7 @@ export function ProductCard({ product, onOpen, onAdd, disabled }) {
       </button>
       <div className="product-meta">
         <span>{product.category}</span>
-        <span className={product.stock ? 'stock' : 'sold-out'}>
-          {product.stock ? `在庫 ${product.stock} 点` : 'この店舗では在庫なし'}
-        </span>
+        <span className={stockClass}>{stockLabel}</span>
       </div>
       <button className="product-name" onClick={onOpen}>
         {product.name}

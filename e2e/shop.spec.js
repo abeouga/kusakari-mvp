@@ -9,6 +9,8 @@ test('browse, search, real cart, checkout and reload persisted order', async ({ 
   try {
     await page.goto('/');
     await expect(page.getByTestId('product-olive')).toBeVisible();
+    await page.getByRole('link', { name: 'お気に入りの植物を探す' }).click();
+    await expect(page).toHaveURL(/#plants$/);
     await page.getByRole('button', { name: 'ハーブ', exact: true }).click();
     await expect(page.getByTestId('product-rosemary')).toBeVisible();
     await expect(page.getByTestId('product-olive')).toHaveCount(0);
@@ -16,7 +18,15 @@ test('browse, search, real cart, checkout and reload persisted order', async ({ 
     await page.getByLabel('植物を検索').fill('monstera');
     await expect(page.getByTestId('product-monstera')).toBeVisible();
     await expect(page.getByTestId('product-olive')).toHaveCount(0);
+    await page.getByLabel('植物を検索').fill('  ks-olv-001  ');
+    await expect(page.getByTestId('product-olive')).toBeVisible();
+    await expect(page.locator('.product-card')).toHaveCount(1);
+    await page.getByRole('button', { name: 'ハーブ', exact: true }).click();
+    await expect(page.locator('.product-card')).toHaveCount(0);
+    await page.getByRole('button', { name: 'すべて', exact: true }).click();
     await page.getByRole('button', { name: '検索をクリア' }).click();
+    await page.getByLabel('商品の並び順').selectOption('price-desc');
+    await expect(page.locator('.product-card').first()).toHaveAttribute('data-testid', 'product-olive');
     await page.getByLabel('商品の並び順').selectOption('price-asc');
     await expect(page.locator('.product-card').first()).toHaveAttribute('data-testid', 'product-rosemary');
     await page.getByRole('button', { name: 'オリーブの詳細', exact: true }).click();
@@ -123,4 +133,57 @@ test('visible error and retry after an explicitly injected network outage', asyn
   await page.getByRole('button', { name: '再読み込み', exact: true }).click();
   await expect(page.getByTestId('product-olive')).toBeVisible();
   await expect(page.getByRole('alert')).toHaveCount(0);
+});
+
+test('checkout retry after an explicitly lost response keeps the same order', async ({ page }) => {
+  let order;
+  const payloads = [];
+  try {
+    await page.goto('/');
+    await expect(page.getByTestId('product-rosemary')).toBeVisible();
+    const productsResponse = await page.request.get('/api/products?storeId=1');
+    const products = await productsResponse.json();
+    const before = products.find((product) => product.id === 'rosemary').stock;
+    await page.getByRole('button', { name: 'ローズマリーをカートに追加' }).click();
+    await expect(page.getByRole('button', { name: 'カートを開く（1点）' })).toBeVisible();
+    await page.getByRole('button', { name: /カートを開く/ }).click();
+    await page.getByRole('button', { name: '注文内容を確認する' }).click();
+    await page.route('**/api/orders', async (route) => {
+      if (route.request().method() !== 'POST') {
+        await route.continue();
+        return;
+      }
+      payloads.push(route.request().postDataJSON());
+      if (payloads.length === 1) {
+        // 実APIで注文を保存した後、ブラウザーへの応答だけを遮断します。
+        const saved = await route.fetch();
+        order = await saved.json();
+        await route.abort();
+        return;
+      }
+      await route.continue();
+    });
+    await page.getByRole('button', { name: 'デモ注文を確定する' }).click();
+    await expect(page.getByRole('alert')).toContainText('サーバーに接続できません');
+    await page.getByRole('button', { name: 'デモ注文を確定する' }).click();
+    await expect(page.getByRole('dialog')).toContainText('注文を保存しました');
+    expect(payloads).toHaveLength(2);
+    expect(payloads[1]).toEqual(payloads[0]);
+    await page.reload();
+    await expect(page.getByRole('button', { name: 'カートを開く（0点）' })).toBeVisible();
+    await page.getByRole('button', { name: '注文履歴', exact: true }).first().click();
+    await expect(page.getByRole('dialog')).toContainText(order.id);
+    const historyResponse = await page.request.get('/api/orders');
+    const history = await historyResponse.json();
+    expect(history).toHaveLength(1);
+    expect(history[0].id).toBe(order.id);
+    const afterResponse = await page.request.get('/api/products?storeId=1');
+    const after = await afterResponse.json();
+    expect(after.find((product) => product.id === 'rosemary').stock).toBe(before - 1);
+    await mkdir('artifacts/e2e', { recursive: true });
+    await writeFile('artifacts/e2e/checkout-retry-after-reload.json', JSON.stringify(history, null, 2));
+    await page.screenshot({ path: 'artifacts/e2e/checkout-retry-after-reload.png', fullPage: true });
+  } finally {
+    if (order) replenishOrder(order, 1);
+  }
 });

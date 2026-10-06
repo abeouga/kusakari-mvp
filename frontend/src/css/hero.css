@@ -71,6 +71,7 @@
   color: var(--green);
 }
 .hero-button {
+  text-decoration: none;
   padding: 17px 25px;
   gap: 35px;
 }

@@ -18,16 +18,26 @@ export function Materials({ shop, onClose }) {
   const [matches, setMatches] = useState(/** @type {import('../types').MaterialMatch[]} */ ([]));
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  let searchLabel = '商品候補を検索';
+  if (busy) searchLabel = '検索中…';
+  let errorMessage = shop.error;
+  if (error) errorMessage = error;
   async function search() {
+    if (!shop.cart) return;
     setError('');
     setBusy(true);
     setMatches([]);
     try {
       const items = JSON.parse(source);
-      if (!Array.isArray(items)) throw new Error('材料リストはJSON配列で入力してください。');
-      setMatches(await api.materials(shop.cart?.storeId || 1, items));
+      if (!Array.isArray(items)) {
+        throw new Error('材料リストはJSON配列で入力してください。');
+      }
+      const results = await api.materials(shop.cart.storeId, items);
+      setMatches(results);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : '材料リストを確認してください。');
+      let message = '材料リストを確認してください。';
+      if (reason instanceof Error) message = reason.message;
+      setError(message);
     } finally {
       setBusy(false);
     }
@@ -55,13 +65,13 @@ export function Materials({ shop, onClose }) {
         対応コード：plant.olive / plant.lavender / plant.rosemary / plant.monstera / plant.herb。単位は
         piece（鉢）です。Greenlyとはまだ接続していません。
       </p>
-      <button className="primary-button" disabled={busy || shop.busy} onClick={() => void search()}>
-        {busy ? '検索中…' : '商品候補を検索'}
+      <button className="primary-button" disabled={busy || shop.busy || !shop.cart} onClick={search}>
+        {searchLabel}
         <ArrowRight size={17} />
       </button>
-      {(error || shop.error) && (
+      {errorMessage && (
         <p className="error" role="alert">
-          {error || shop.error}
+          {errorMessage}
         </p>
       )}
       {shop.notice && (
@@ -89,9 +99,10 @@ export function Materials({ shop, onClose }) {
                 <button
                   className="secondary-button"
                   disabled={shop.busy || !candidate.available}
-                  onClick={() => void shop.add(candidate.product.id, candidate.purchaseQuantity)}
+                  onClick={() => shop.add(candidate.product.id, candidate.purchaseQuantity)}
                 >
-                  {candidate.available ? 'カートに追加' : '在庫不足'}
+                  {candidate.available && 'カートに追加'}
+                  {!candidate.available && '在庫不足'}
                 </button>
               </div>
             ))}

@@ -22,6 +22,7 @@
   border-bottom: 1px solid var(--line);
 }
 .brand {
+  text-decoration: none;
   display: inline-flex;
   align-items: center;
   gap: 10px;
@@ -46,7 +47,9 @@
   gap: 32px;
   margin: auto;
 }
-.site-header nav button {
+.site-header nav button,
+.site-header nav a {
+  text-decoration: none;
   background: none;
   border: 0;
   padding: 32px 0;

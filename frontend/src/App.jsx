@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import {
   ArrowDown,
   ArrowRight,
@@ -33,23 +33,36 @@ export default function App() {
   const [sort, setSort] = useState('recommended');
   const [inStockOnly, setInStockOnly] = useState(false);
   const detail = shop.products.find((product) => product.id === detailId);
-  const products = useMemo(() => {
-    const filtered = shop.products.filter(
-      (product) =>
-        (category === 'すべて' || product.category === category) &&
-        `${product.name} ${product.latinName} ${product.sku}`.toLowerCase().includes(search.trim().toLowerCase()) &&
-        (!inStockOnly || product.stock > 0),
-    );
-    return sort === 'recommended'
-      ? filtered
-      : filtered.sort((a, b) => (sort === 'price-asc' ? a.priceYen - b.priceYen : b.priceYen - a.priceYen));
-  }, [shop.products, category, search, sort, inStockOnly]);
-  const close = () => {
+  const keyword = search.trim().toLowerCase();
+  const products = [];
+  for (const product of shop.products) {
+    if (category !== 'すべて' && product.category !== category) continue;
+    if (inStockOnly && product.stock === 0) continue;
+    const text = `${product.name} ${product.latinName} ${product.sku}`.toLowerCase();
+    if (!text.includes(keyword)) continue;
+    products.push(product);
+  }
+  if (sort === 'price-asc') {
+    products.sort((a, b) => a.priceYen - b.priceYen);
+  }
+  if (sort === 'price-desc') {
+    products.sort((a, b) => b.priceYen - a.priceYen);
+  }
+  let itemCount = 0;
+  let storeName = '';
+  let storeLabel = '読み込み中…';
+  if (shop.cart) {
+    itemCount = shop.cart.itemCount;
+    storeName = shop.cart.storeName;
+    storeLabel = storeName;
+  }
+  const loading = !shop.cart && shop.busy;
+
+  function close() {
     setPanel('');
     setDetailId('');
     shop.setLastOrder(null);
-  };
-  const toPlants = () => document.getElementById('plants')?.scrollIntoView({ behavior: 'smooth' });
+  }
   /** @param {string} next */
   function open(next) {
     shop.setError('');
@@ -68,20 +81,16 @@ export default function App() {
         <span>植物のオンラインストア</span>
       </div>
       <header className="site-header">
-        <button
-          className="brand"
-          onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-          aria-label="Kusakari トップへ"
-        >
+        <a className="brand" href="#" aria-label="Kusakari トップへ">
           <Sprout strokeWidth={1.5} />
           <span>
             kusakari<span className="brand-dot">.</span>
           </span>
-        </button>
+        </a>
         <nav aria-label="メインナビゲーション">
-          <button className="active" onClick={toPlants}>
+          <a className="active" href="#plants">
             植物を探す
-          </button>
+          </a>
           <button onClick={() => open('stores')}>店舗を探す</button>
           <button onClick={() => open('guide')}>Kusakariについて</button>
         </nav>
@@ -89,14 +98,10 @@ export default function App() {
           <button className="history-button" onClick={() => open('orders')}>
             注文履歴
           </button>
-          <button
-            className="bag-button"
-            onClick={() => open('cart')}
-            aria-label={`カートを開く（${shop.cart?.itemCount || 0}点）`}
-          >
+          <button className="bag-button" onClick={() => open('cart')} aria-label={`カートを開く（${itemCount}点）`}>
             <ShoppingBag size={20} />
             <span className="bag-text">バッグ</span>
-            <span className="bag-count">{shop.cart?.itemCount || 0}</span>
+            <span className="bag-count">{itemCount}</span>
           </button>
         </div>
       </header>
@@ -119,10 +124,10 @@ export default function App() {
               <br />
               あなたの毎日に、ひと鉢の余白を。
             </p>
-            <button className="primary-button hero-button" onClick={toPlants}>
+            <a className="primary-button hero-button" href="#plants">
               お気に入りの植物を探す
               <ArrowRight size={18} />
-            </button>
+            </a>
             <div className="hero-footnote">
               <span>01 — THE GREEN COLLECTION</span>
               <ArrowDown size={16} />
@@ -191,7 +196,7 @@ export default function App() {
             <span>
               <MapPin size={17} />
               <small>受取店舗</small>
-              <strong>{shop.cart?.storeName || '読み込み中…'}</strong>
+              <strong>{storeLabel}</strong>
             </span>
             <button onClick={() => open('stores')} disabled={!shop.cart}>
               店舗を変更
@@ -201,12 +206,7 @@ export default function App() {
           <div className="catalog-controls">
             <div className="categories" aria-label="商品カテゴリー">
               {categories.map((item) => (
-                <button
-                  key={item}
-                  className={category === item ? 'selected' : ''}
-                  aria-pressed={category === item}
-                  onClick={() => setCategory(item)}
-                >
+                <button key={item} aria-pressed={category === item} onClick={() => setCategory(item)}>
                   {item}
                 </button>
               ))}
@@ -249,16 +249,17 @@ export default function App() {
           {shop.error && !panel && !detail && (
             <div className="error" role="alert">
               {shop.error}
-              <button className="text-button" onClick={() => void shop.initialize()} disabled={shop.busy}>
+              <button className="text-button" onClick={shop.initialize} disabled={shop.busy}>
                 再読み込み
               </button>
             </div>
           )}
-          {!shop.cart && shop.busy ? (
+          {loading && (
             <div className="loading" role="status">
               植物を読み込んでいます…
             </div>
-          ) : (
+          )}
+          {!loading && (
             <div className="product-grid">
               {products.map((product) => (
                 <ProductCard
@@ -269,7 +270,7 @@ export default function App() {
                     shop.setNotice('');
                     setDetailId(product.id);
                   }}
-                  onAdd={() => void shop.add(product.id)}
+                  onAdd={() => shop.add(product.id)}
                   disabled={shop.busy || !shop.cart}
                 />
               ))}
@@ -372,9 +373,9 @@ export default function App() {
       {detail && (
         <ProductDetail
           product={detail}
-          storeName={shop.cart?.storeName || ''}
+          storeName={storeName}
           onClose={close}
-          onAdd={() => void shop.add(detail.id)}
+          onAdd={() => shop.add(detail.id)}
           busy={shop.busy}
           notice={shop.notice}
           error={shop.error}
@@ -385,9 +386,10 @@ export default function App() {
       {panel === 'materials' && <Materials shop={shop} onClose={close} />}
       {panel === 'orders' && (
         <Dialog title="注文履歴" onClose={close}>
-          {shop.orders.length ? (
-            shop.orders.map((order) => <OrderSummary order={order} key={order.id} />)
-          ) : (
+          {shop.orders.map((order) => (
+            <OrderSummary order={order} key={order.id} />
+          ))}
+          {shop.orders.length === 0 && (
             <div className="empty">
               <PackageCheck size={36} />
               <h3>注文履歴はまだありません。</h3>

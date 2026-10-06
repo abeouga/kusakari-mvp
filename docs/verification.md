@@ -1,5 +1,32 @@
 # 検証記録
 
+## 2026-10-06: JavaScriptの簡素化
+
+実行先: `C:\Users\t_abe\Desktop\kusakari-mvp`。
+
+- 商品の絞り込みは`for...of`と条件分岐、価格順は昇順・降順それぞれの分岐にしました。不要な`useMemo`を削除しました。
+- ページ内移動はHTMLリンクとCSSに変更し、スクロール用のJavaScriptを削除しました。カテゴリー選択の装飾は既存の`aria-pressed`をCSSで参照します。
+- フロントの三項演算子、optional chaining、nullish代入、オブジェクトのスプレッドを、明示的な条件分岐または必要な引数へ置き換えました。Java起動スクリプトの入れ子の三項演算子も分岐にしました。
+- HTTPはGET・PUT・POSTで必要な引数だけを渡します。商品・注文の取得は順に実行します。カートのrevision、操作中の再実行防止、注文再試行での同じ要求IDの保持は維持しています。
+- コードの行数や配信容量の最小化ではなく、不要な処理の削除と読みやすい分岐への変更です。React、checkJs、API/MySQLの責務分離を維持しました。
+
+| 検証 | 結果 |
+|---|---|
+| `npm run typecheck` | 成功 |
+| `npm run lint` | 成功 |
+| `npm run build:web` | 成功 |
+| `npm run build:api` | 成功。Javaユニットテストは既存構成どおり実行せず |
+| `npm run test:e2e` | 実API・専用MySQL `kusakari_e2e`・Chromiumで8件成功（50.9秒） |
+| 変更したJS・JSX・CSSのPrettier確認 | 成功 |
+| PC・390pxの画面 | 保存したスクリーンショットを目視確認。レイアウトと画像の表示を確認 |
+
+既存の購入E2Eに、HTMLリンクによる移動、空白・小文字を含む品番検索、カテゴリーと検索の組み合わせ、価格降順の検証を追加しました。
+注文要求の保持は、実APIが注文を保存した後でブラウザーへの応答だけを遮断するE2Eを追加して確認しました。再試行は同じ要求を送り、再読み込み後の注文1件と在庫減少1点を確認しました。正常応答はモックしていません。テストで購入した在庫だけを専用DBへ補充しています。
+
+注文・再試行後のAPI JSONと画面は`artifacts/e2e/order-after-reload.*`、`artifacts/e2e/checkout-retry-after-reload.*`、一覧画面は`artifacts/e2e/catalog-desktop.png`、`artifacts/e2e/catalog-mobile.png`に保存しました。E2Eレポートは`artifacts/playwright-report/index.html`です。
+
+フロント全体のPrettier確認では、今回変更していない14ファイルに整形警告がありました。無関係な整形変更は加えていません。依存・ロックファイル、Javaの業務コード、開発DB、Greenlyは変更していません。
+
 ## 2026-10-04: 作業フォルダの改名
 
 作業フォルダを `C:\Users\hanam\Desktop\kusakari` から `C:\Users\hanam\Desktop\kusakari-mvp` に変更しました。SysOverRayのプロジェクト検出は固定フォルダ名ではなく、`package.json`、`backend/pom.xml`、`scripts/start.ps1`を確認する方式に変更しました。下記の2026-10-02記録は当時の実行場所を示すため旧パスを維持しています。

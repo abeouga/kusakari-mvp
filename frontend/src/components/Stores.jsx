@@ -1,8 +1,21 @@
 import { MapPin, Navigation, Check, Clock } from 'lucide-react';
 import { Dialog } from './Dialog';
 
+const points = [
+  { name: '東京駅', latitude: 35.6812, longitude: 139.7671 },
+  { name: '横浜駅', latitude: 35.466, longitude: 139.622 },
+  { name: '大宮駅', latitude: 35.906, longitude: 139.624 },
+];
+
 /** @param {{shop:ReturnType<import('../useShop').useShop>, onClose:()=>void}} props */
 export function Stores({ shop, onClose }) {
+  /** @param {import('react').ChangeEvent<HTMLSelectElement>} event */
+  function changeLocation(event) {
+    const point = points.find((item) => item.name === event.target.value);
+    if (point) {
+      shop.locate(point.latitude, point.longitude, point.name);
+    }
+  }
   return (
     <Dialog title="受取店舗を選ぶ" onClose={onClose} wide>
       {shop.error && (
@@ -14,23 +27,10 @@ export function Stores({ shop, onClose }) {
       <div className="location-controls">
         <label>
           距離の基準
-          <select
-            aria-label="距離の基準"
-            disabled={shop.busy}
-            value={shop.locationLabel}
-            onChange={(event) => {
-              const points = /** @type {Record<string, [number, number]>} */ ({
-                東京駅: [35.6812, 139.7671],
-                横浜駅: [35.466, 139.622],
-                大宮駅: [35.906, 139.624],
-              });
-              const point = points[event.target.value];
-              if (point) void shop.locate(...point, event.target.value);
-            }}
-          >
-            <option>東京駅</option>
-            <option>横浜駅</option>
-            <option>大宮駅</option>
+          <select aria-label="距離の基準" disabled={shop.busy} value={shop.locationLabel} onChange={changeLocation}>
+            {points.map((point) => (
+              <option key={point.name}>{point.name}</option>
+            ))}
             {shop.locationLabel === '現在地' && <option>現在地</option>}
           </select>
         </label>
@@ -40,35 +40,44 @@ export function Stores({ shop, onClose }) {
         </button>
       </div>
       <div className="store-list">
-        {shop.stores.map((store, index) => (
-          <article className={`store-card ${store.id === shop.cart?.storeId ? 'selected' : ''}`} key={store.id}>
-            <div className="store-title">
-              <MapPin size={22} />
-              <h3>{store.name}</h3>
-              {index === 0 && <span className="pill">最寄り</span>}
-              <strong>{store.distanceKm} km</strong>
-            </div>
-            <p>{store.address}</p>
-            <p>
-              <Clock size={14} />
-              {store.hours}
-            </p>
-            <button
-              className={store.id === shop.cart?.storeId ? 'secondary-button' : 'primary-button'}
-              disabled={shop.busy || store.id === shop.cart?.storeId}
-              onClick={() => void shop.selectStore(store.id)}
-            >
-              {store.id === shop.cart?.storeId ? (
-                <>
-                  <Check size={16} />
-                  選択中
-                </>
-              ) : (
-                'この店舗で受け取る'
-              )}
-            </button>
-          </article>
-        ))}
+        {shop.stores.map((store, index) => {
+          let selected = false;
+          if (shop.cart) selected = store.id === shop.cart.storeId;
+          let cardClass = 'store-card';
+          let buttonClass = 'primary-button';
+          if (selected) {
+            cardClass = 'store-card selected';
+            buttonClass = 'secondary-button';
+          }
+          return (
+            <article className={cardClass} key={store.id}>
+              <div className="store-title">
+                <MapPin size={22} />
+                <h3>{store.name}</h3>
+                {index === 0 && <span className="pill">最寄り</span>}
+                <strong>{store.distanceKm} km</strong>
+              </div>
+              <p>{store.address}</p>
+              <p>
+                <Clock size={14} />
+                {store.hours}
+              </p>
+              <button
+                className={buttonClass}
+                disabled={shop.busy || selected}
+                onClick={() => shop.selectStore(store.id)}
+              >
+                {selected && (
+                  <>
+                    <Check size={16} />
+                    選択中
+                  </>
+                )}
+                {!selected && 'この店舗で受け取る'}
+              </button>
+            </article>
+          );
+        })}
       </div>
       <p className="fine-print">店舗はすべて架空です。実店舗の営業時間・在庫とは連動していません。</p>
     </Dialog>

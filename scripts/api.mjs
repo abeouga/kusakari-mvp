@@ -17,16 +17,20 @@ if (mode === 'e2e') {
 }
 const build = mode === 'build';
 const windowsBuild = build && process.platform === 'win32';
-const command = build ? (windowsBuild ? 'mvnw.cmd -B -ntp package -DskipTests' : './mvnw') : 'java';
-const args = build
-  ? windowsBuild
-    ? []
-    : ['-B', '-ntp', 'package', '-DskipTests']
-  : ['-jar', 'target/kusakari-api-0.1.0.jar'];
+let command = 'java';
+let args = ['-jar', 'target/kusakari-api-0.1.0.jar'];
+if (build) {
+  command = './mvnw';
+  args = ['-B', '-ntp', 'package', '-DskipTests'];
+  if (windowsBuild) {
+    command = 'mvnw.cmd -B -ntp package -DskipTests';
+    args = [];
+  }
+}
 const child = spawn(command, args, {
   cwd: resolve(root, 'backend'),
   stdio: 'inherit',
-  shell: build && process.platform === 'win32',
+  shell: windowsBuild,
 });
 child.on('error', (error) => {
   console.error(error.message);

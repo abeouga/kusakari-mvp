@@ -17,7 +17,8 @@ export function useShop() {
   const refresh = useCallback(async () => {
     const nextCart = await api.cart();
     setCart(nextCart);
-    const [nextProducts, nextOrders] = await Promise.all([api.products(nextCart.storeId), api.orders()]);
+    const nextProducts = await api.products(nextCart.storeId);
+    const nextOrders = await api.orders();
     setProducts(nextProducts);
     setOrders(nextOrders);
   }, []);
@@ -32,7 +33,9 @@ export function useShop() {
       try {
         await action();
       } catch (reason) {
-        setError(reason instanceof Error ? reason.message : '処理に失敗しました。');
+        let message = '処理に失敗しました。';
+        if (reason instanceof Error) message = reason.message;
+        setError(message);
         if (reason instanceof ApiError && reason.status === 409) {
           checkoutRequest.current = null;
           try {
@@ -63,23 +66,31 @@ export function useShop() {
   }, [initialize]);
 
   /** @param {string} id @param {number} quantity */
-  const setQuantity = (id, quantity) =>
-    run(async () => {
+  function setQuantity(id, quantity) {
+    return run(async () => {
       if (!cart) return;
       setCart(await api.setItem(id, quantity, cart.revision));
       checkoutRequest.current = null;
-      setNotice(quantity === 0 ? 'カートから削除しました。' : 'カートを更新しました。');
+      if (quantity === 0) {
+        setNotice('カートから削除しました。');
+      } else {
+        setNotice('カートを更新しました。');
+      }
     });
+  }
 
   /** @param {string} id @param {number} [quantity] */
-  const add = (id, quantity = 1) => {
-    const current = cart?.items.find((line) => line.product.id === id)?.quantity || 0;
-    return setQuantity(id, current + quantity);
-  };
+  function add(id, quantity = 1) {
+    if (!cart) return;
+    let currentQuantity = 0;
+    const line = cart.items.find((item) => item.product.id === id);
+    if (line) currentQuantity = line.quantity;
+    return setQuantity(id, currentQuantity + quantity);
+  }
 
   /** @param {number} id */
-  const selectStore = (id) =>
-    run(async () => {
+  function selectStore(id) {
+    return run(async () => {
       if (!cart) return;
       const next = await api.setStore(id, cart.revision);
       setCart(next);
@@ -87,41 +98,47 @@ export function useShop() {
       setProducts(await api.products(id));
       setNotice('受取店舗を変更しました。在庫を確認してください。');
     });
+  }
 
-  const checkout = () =>
-    run(async () => {
+  function checkout() {
+    return run(async () => {
       if (!cart) return;
-      checkoutRequest.current ??= {
-        requestId: crypto.randomUUID(),
-        revision: cart.revision,
-        expectedTotalYen: cart.totalYen,
-      };
+      // 応答が届かなかった場合の再試行では、同じ注文要求を送ります。
+      if (!checkoutRequest.current) {
+        checkoutRequest.current = {
+          requestId: crypto.randomUUID(),
+          revision: cart.revision,
+          expectedTotalYen: cart.totalYen,
+        };
+      }
       const order = await api.checkout(checkoutRequest.current);
       setLastOrder(order);
       checkoutRequest.current = null;
       await refresh();
     });
+  }
 
   /** @param {number} lat @param {number} lon @param {string} label */
-  const locate = (lat, lon, label) =>
-    run(async () => {
+  function locate(lat, lon, label) {
+    return run(async () => {
       setStores(await api.stores(lat, lon));
       setLocationLabel(label);
     });
+  }
 
-  const geolocate = () => {
+  function geolocate() {
     if (!navigator.geolocation) {
       setError('このブラウザーは現在地の取得に対応していません。');
       return;
     }
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        void locate(position.coords.latitude, position.coords.longitude, '現在地');
+        locate(position.coords.latitude, position.coords.longitude, '現在地');
       },
       () => setError('現在地を取得できませんでした。基準地点を選択してください。'),
       { timeout: 10000, maximumAge: 60000 },
     );
-  };
+  }
 
   return {
     cart,

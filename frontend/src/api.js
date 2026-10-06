@@ -6,20 +6,25 @@ export class ApiError extends Error {
   }
 }
 
-/** @param {string} path @param {RequestInit} [options] */
-async function request(path, options = {}) {
+/** @param {string} path @param {string} [method] @param {string} [body] */
+async function request(path, method = 'GET', body) {
   let response;
   try {
     response = await fetch(`/api${path}`, {
-      ...options,
+      method,
+      body,
       credentials: 'same-origin',
-      headers: { 'Content-Type': 'application/json', ...options.headers },
+      headers: { 'Content-Type': 'application/json' },
     });
   } catch {
     throw new ApiError('サーバーに接続できません。接続を確認して再試行してください。', 0);
   }
   const data = await response.json();
-  if (!response.ok) throw new ApiError(data.message || '処理を完了できませんでした。', response.status);
+  if (!response.ok) {
+    let message = '処理を完了できませんでした。';
+    if (data.message) message = data.message;
+    throw new ApiError(message, response.status);
+  }
   return data;
 }
 
@@ -32,17 +37,15 @@ export const api = {
   stores: (latitude, longitude) => request(`/stores?latitude=${latitude}&longitude=${longitude}`),
   /** @param {string} id @param {number} quantity @param {number} revision @returns {Promise<import('./types').Cart>} */
   setItem: (id, quantity, revision) =>
-    request(`/cart/items/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify({ quantity, revision }) }),
+    request(`/cart/items/${encodeURIComponent(id)}`, 'PUT', JSON.stringify({ quantity, revision })),
   /** @param {number} storeId @param {number} revision @returns {Promise<import('./types').Cart>} */
-  setStore: (storeId, revision) =>
-    request('/cart/store', { method: 'PUT', body: JSON.stringify({ storeId, revision }) }),
+  setStore: (storeId, revision) => request('/cart/store', 'PUT', JSON.stringify({ storeId, revision })),
   /** @param {import('./types').Checkout} payload @returns {Promise<import('./types').Order>} */
-  checkout: (payload) => request('/orders', { method: 'POST', body: JSON.stringify(payload) }),
+  checkout: (payload) => request('/orders', 'POST', JSON.stringify(payload)),
   /** @returns {Promise<import('./types').Order[]>} */
   orders: () => request('/orders'),
   /** @param {number} storeId @param {import('./types').MaterialItem[]} items @returns {Promise<import('./types').MaterialMatch[]>} */
-  materials: (storeId, items) =>
-    request('/materials/quote', { method: 'POST', body: JSON.stringify({ storeId, items }) }),
+  materials: (storeId, items) => request('/materials/quote', 'POST', JSON.stringify({ storeId, items })),
 };
 
 /** @param {number} value */
