@@ -1,0 +1,64 @@
+name: Bug
+description: 不具合や想定外の動作を報告する
+title: "[Bug] "
+labels:
+  - Bug
+
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: 不具合の概要
+      description: 何が問題なのか簡潔に記載してください。
+      placeholder: 例）商品削除後も一覧画面に商品が残る
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: 再現手順
+      description: 不具合を再現する手順を記載してください。
+      placeholder: |
+        例）
+        1. 商品一覧を開く
+        2. 商品を削除する
+        3. 一覧画面に戻る
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: 期待する動作
+      description: 本来どう動くべきか記載してください。
+      placeholder: 例）削除した商品が一覧から消える
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: 実際の動作
+      description: 実際に発生している動作を記載してください。
+      placeholder: 例）削除した商品が一覧に残っている
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: 発生環境
+      description: 必要であればブラウザ、OS、ブランチなどを記載してください。
+      placeholder: |
+        例）
+        - Windows 11
+        - Chrome
+        - feature/product-delete
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: エラー・ログ
+      description: エラーメッセージやログがあれば記載してください。
+      render: shell
