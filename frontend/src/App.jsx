@@ -18,7 +18,7 @@ import { ProductManager } from './components/ProductManager';
 import { Orders } from './components/Orders';
 import { ProductDetail } from './components/ProductDetail';
 import { Dialog } from './components/Dialog';
-import { Cart } from './components/Cart';
+import { CartPage } from './components/CartPage';
 import { Stores } from './components/Stores';
 import { Materials } from './components/Materials';
 
@@ -52,6 +52,16 @@ export default function App() {
     setPanel(next);
   }
 
+  if (window.location.pathname === '/cart') {
+    return (
+      <>
+        <CartPage shop={shop} onOrders={() => open('orders')} onStores={() => open('stores')} />
+        {panel === 'stores' && <Stores shop={shop} onClose={close} />}
+        {panel === 'orders' && <Orders shop={shop} onClose={close} />}
+      </>
+    );
+  }
+
   return (
     <>
       <a className="skip-link" href="#plants">
@@ -80,11 +90,11 @@ export default function App() {
           <button className="history-button" onClick={() => open('orders')}>
             注文履歴
           </button>
-          <button className="bag-button" onClick={() => open('cart')} aria-label={`カートを開く（${itemCount}点）`}>
+          <a className="bag-button" href="/cart" aria-label={`カートを開く（${itemCount}点）`}>
             <ShoppingBag size={20} />
             <span className="bag-text">バッグ</span>
             <span className="bag-count">{itemCount}</span>
-          </button>
+          </a>
         </div>
       </header>
 
@@ -227,10 +237,10 @@ export default function App() {
         <div className="toast" role="status">
           <Check size={17} />
           {shop.notice}
-          <button onClick={() => open('cart')}>
+          <a href="/cart">
             カートを見る
             <ArrowRight size={15} />
-          </button>
+          </a>
           <button aria-label="通知を閉じる" onClick={() => shop.setNotice('')}>
             <X size={16} />
           </button>
@@ -248,7 +258,6 @@ export default function App() {
           error={shop.error}
         />
       )}
-      {panel === 'cart' && <Cart shop={shop} onClose={close} onStores={() => open('stores')} />}
       {panel === 'stores' && <Stores shop={shop} onClose={close} />}
       {panel === 'materials' && <Materials shop={shop} onClose={close} />}
       {panel === 'orders' && <Orders shop={shop} onClose={close} />}

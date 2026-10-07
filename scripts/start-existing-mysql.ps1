@@ -1,4 +1,4 @@
-param(
+﻿param(
     [switch]$NoBrowser,
     [switch]$NoOverlay
 )
@@ -8,7 +8,7 @@ param(
 $ErrorActionPreference = 'Stop'
 
 try {
-    $projectRoot = [IO.Path]::GetFullPath((Split-Path $PSScriptRoot -Parent)).TrimEnd('\')
+    $projectRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
     $settings = Join-Path $projectRoot '.env'
     $modeLine = if (Test-Path -LiteralPath $settings) { Get-Content -LiteralPath $settings | Where-Object { $_ -eq 'KUSAKARI_DATABASE_MODE=existing' } | Select-Object -First 1 }
     $portLine = if (Test-Path -LiteralPath $settings) { Get-Content -LiteralPath $settings | Where-Object { $_ -eq 'KUSAKARI_DB_PORT=3306' } | Select-Object -First 1 }

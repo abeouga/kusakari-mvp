@@ -147,10 +147,7 @@ function Get-AutoPort {
     }
     if ($listening.Count -eq 1) { return [int]$listening[0] }
     if ($listening.Count -gt 1) { throw 'Both ports 3306 and 3307 are active. Re-run with -Port 3306 or -Port 3307.' }
-    $files = @(
-        (Join-Path $PSScriptRoot '..\.env'),
-        (Join-Path $env:USERPROFILE 'Desktop\greenly-mvp\.env')
-    )
+    $files = @((Join-Path $PSScriptRoot '..\.env'))
     $ports = @($files | Where-Object { Test-Path -LiteralPath $_ } | ForEach-Object { Get-PortFromFile $_ } | Where-Object { $_ -gt 0 } | Select-Object -Unique)
     if ($ports.Count -eq 1) { return [int]$ports[0] }
     return 3306

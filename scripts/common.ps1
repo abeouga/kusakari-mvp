@@ -1,5 +1,5 @@
 ﻿$ErrorActionPreference = 'Stop'
-$projectRoot = [IO.Path]::GetFullPath((Split-Path $PSScriptRoot -Parent)).TrimEnd('\')
+$projectRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 # A .bat launched from PowerShell 7 can inherit its incompatible core modules.
 if ($PSVersionTable.PSVersion.Major -eq 5) { $env:PSModulePath = "$PSHOME\Modules;$env:PSModulePath" }
 $runtimeDir = Join-Path $projectRoot '.runtime'

@@ -1,32 +1,53 @@
 import { useState } from 'react';
 import { ShoppingBag, MapPin, Minus, Plus, Trash2, ArrowRight, CheckCircle2 } from 'lucide-react';
-import { Dialog } from './Dialog';
 import { yen } from '../api';
 import { DeliveryForm } from './DeliveryForm';
 import { DeliverySummary } from './DeliverySummary';
 
-/** @param {{shop:ReturnType<import('../useShop').useShop>, onClose:()=>void, onStores:()=>void}} props */
-export function Cart({ shop, onClose, onStores }) {
+/** @param {{shop:ReturnType<import('../useShop').useShop>,onStores:()=>void}} props */
+export function Cart({ shop, onStores }) {
   const [confirming, setConfirming] = useState(false);
   const cart = shop.cart;
   if (shop.lastOrder) {
     return (
-      <Dialog title="注文を保存しました" onClose={onClose}>
+      <section className="cart-content cart-complete">
+        <h1>注文を保存しました</h1>
         <div className="order-success">
           <CheckCircle2 size={42} />
           <h3>植物を迎える準備ができました。</h3>
           <p>デモ注文のため、お支払い・実際の取り置きは発生しません。</p>
         </div>
         <OrderSummary order={shop.lastOrder} />
-        <button className="primary-button full" onClick={onClose}>
+        <a className="primary-button full" href="/#plants">
           お買い物を続ける
-        </button>
-      </Dialog>
+        </a>
+      </section>
     );
   }
-  if (!cart || cart.items.length === 0) {
+  if (!cart) {
     return (
-      <Dialog title="ショッピングカート (0)" onClose={onClose}>
+      <section className="cart-content cart-empty-state">
+        <p className="eyebrow">YOUR SHOPPING BAG</p>
+        <h1>ショッピングカート</h1>
+        {shop.error && (
+          <>
+            <p className="error" role="alert">
+              {shop.error}
+            </p>
+            <a className="primary-button" href="/#plants">
+              植物を探す
+            </a>
+          </>
+        )}
+        {!shop.error && <p role="status">カートを読み込んでいます。</p>}
+      </section>
+    );
+  }
+  if (cart.items.length === 0) {
+    return (
+      <section className="cart-content cart-empty-state">
+        <p className="eyebrow">YOUR SHOPPING BAG</p>
+        <h1>ショッピングカート</h1>
         {shop.error && (
           <p className="error" role="alert">
             {shop.error}
@@ -36,11 +57,11 @@ export function Cart({ shop, onClose, onStores }) {
           <ShoppingBag size={40} />
           <h3>まだ植物が入っていません。</h3>
           <p>お気に入りのひと鉢を見つけてください。</p>
-          <button className="primary-button" onClick={onClose}>
+          <a className="primary-button" href="/#plants">
             植物を探す
-          </button>
+          </a>
         </div>
-      </Dialog>
+      </section>
     );
   }
   let title = `ショッピングカート (${cart.itemCount})`;
@@ -48,7 +69,10 @@ export function Cart({ shop, onClose, onStores }) {
   if (confirming) title = '注文内容の確認';
   if (shop.busy) checkoutLabel = '保存中…';
   return (
-    <Dialog title={title} onClose={onClose} wide>
+    <section className="cart-content">
+      <p className="eyebrow">YOUR SHOPPING BAG</p>
+      <h1>{title}</h1>
+      <p className="cart-page-lead">商品と受取方法をご確認ください。</p>
       <ol className="step-list">
         <li>1 カート確認</li>
         <li>2 受取・配送</li>
@@ -175,7 +199,7 @@ export function Cart({ shop, onClose, onStores }) {
           )}
         </aside>
       </div>
-    </Dialog>
+    </section>
   );
 }
 
