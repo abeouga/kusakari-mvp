@@ -2,9 +2,28 @@ import { useState } from 'react';
 import { formText } from '../forms';
 
 /** @param {{details:import('../types').DeliveryDetails,busy:boolean,onSave:(details:import('../types').DeliveryDetails)=>Promise<boolean|undefined>,onReset?:()=>void,lockedMethod?:boolean}} props */
-export function DeliveryForm({ details, busy, onSave, onReset, lockedMethod = false }) {
-  const [method, setMethod] = useState(details.fulfillmentMethod);
-  const [payment, setPayment] = useState(details.paymentMethod);
+export function DeliveryForm({
+  details,
+  busy,
+  onSave,
+  onReset,
+  lockedMethod = false,
+}) {
+  const safeDetails = details ?? {
+    fulfillmentMethod: "PICKUP",
+    paymentMethod: "",
+    recipientName: "",
+    recipientPhone: "",
+    contactEmail: "",
+    postalCode: "",
+    addressLine1: "",
+    addressLine2: "",
+    requestedDate: "",
+    timeSlot: "",
+  };
+
+  const [method, setMethod] = useState(safeDetails.fulfillmentMethod);
+  const [payment, setPayment] = useState(safeDetails.paymentMethod);
 
   /** @param {import('react').ChangeEvent<HTMLSelectElement>} event */
   function changeMethod(event) {
@@ -56,7 +75,7 @@ export function DeliveryForm({ details, busy, onSave, onReset, lockedMethod = fa
           受取者名
           <input
             name="recipientName"
-            defaultValue={details.recipientName}
+            defaultValue={safeDetails.recipientName}
             maxLength={100}
             required={method === 'DELIVERY'}
           />
@@ -66,14 +85,14 @@ export function DeliveryForm({ details, busy, onSave, onReset, lockedMethod = fa
           <input
             name="recipientPhone"
             type="tel"
-            defaultValue={details.recipientPhone}
+            defaultValue={safeDetails.recipientPhone}
             maxLength={30}
             required={method === 'DELIVERY'}
           />
         </label>
         <label className="form-full">
           メールアドレス
-          <input name="contactEmail" type="email" defaultValue={details.contactEmail} maxLength={200} />
+          <input name="contactEmail" type="email" defaultValue={safeDetails.contactEmail} maxLength={200} />
         </label>
         {method === 'DELIVERY' && (
           <>
@@ -81,7 +100,7 @@ export function DeliveryForm({ details, busy, onSave, onReset, lockedMethod = fa
               郵便番号
               <input
                 name="postalCode"
-                defaultValue={details.postalCode}
+                defaultValue={safeDetails.postalCode}
                 maxLength={8}
                 pattern="[0-9]{3}-?[0-9]{4}"
                 required
@@ -89,21 +108,21 @@ export function DeliveryForm({ details, busy, onSave, onReset, lockedMethod = fa
             </label>
             <label className="form-full">
               住所
-              <input name="addressLine1" defaultValue={details.addressLine1} maxLength={200} required />
+              <input name="addressLine1" defaultValue={safeDetails.addressLine1} maxLength={200} required />
             </label>
             <label className="form-full">
               建物名・部屋番号
-              <input name="addressLine2" defaultValue={details.addressLine2} maxLength={200} />
+              <input name="addressLine2" defaultValue={safeDetails.addressLine2} maxLength={200} />
             </label>
           </>
         )}
         <label>
           受取・配送希望日
-          <input name="requestedDate" type="date" defaultValue={details.requestedDate} />
+          <input name="requestedDate" type="date" defaultValue={safeDetails.requestedDate} />
         </label>
         <label>
           希望時間帯
-          <select name="timeSlot" defaultValue={details.timeSlot}>
+          <select name="timeSlot" defaultValue={safeDetails.timeSlot}>
             <option value="ANY">指定なし</option>
             <option value="10-12">10:00〜12:00</option>
             <option value="14-16">14:00〜16:00</option>

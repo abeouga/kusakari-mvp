@@ -5,11 +5,23 @@ import { yen } from '../api';
 
 /** @param {{product:import('../types').Product,storeName:string,onClose:()=>void,onAdd:(quantity:number)=>void,busy:boolean,notice:string,error:string}} props */
 export function ProductDetail({ product, storeName, onClose, onAdd, busy, notice, error }) {
+  
   const [image, setImage] = useState(product.imageUrl);
   const [quantity, setQuantity] = useState(1);
-  const images = [product.imageUrl];
-  for (const url of product.images) {
-    if (!images.includes(url)) images.push(url);
+
+  const images = [];
+  if (product.imageUrl) {
+    images.push(product.imageUrl);
+  }
+
+  const productImages = Array.isArray(product.images)
+    ? product.images
+    : [];
+
+  for (const url of productImages) {
+    if (url && !images.includes(url)) {
+      images.push(url);
+    }
   }
   let maxQuantity = 99;
   if (product.stock < maxQuantity) maxQuantity = product.stock;
